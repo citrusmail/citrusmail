@@ -79,8 +79,37 @@ export function statusError(status: number, host: string, kind: Kind): Error {
   return davError(new Error(`HTTP ${status}`), host, kind)
 }
 
-function serverUrlOf(account: AccountSettings, kind: Kind): string | undefined {
-  return (kind === 'caldav' ? account.caldav : account.carddav)?.trim() || undefined
+/**
+ * Where an account signed in before its calendar could be found (or with no
+ * address given) looks for one: on its mail servers, remembered per server
+ * for an hour (a miss for five minutes), so page loads don't keep waiting on it
+ */
+const FOUND_TTL = 60 * 60 * 1000
+// A miss is checked again sooner, so "Look again" means something
+const MISSED_TTL = 5 * 60 * 1000
+const found = new Map<string, { expires: number, urls: Promise<{ caldav?: string, carddav?: string }> }>()
+
+export function foundOnMailHost(account: AccountSettings) {
+  const key = `${account.incoming.host}\n${account.outgoing.host}`
+  const now = Date.now()
+  let entry = found.get(key)
+  if (!entry || entry.expires <= now) {
+    if (found.size > MAX_ENTRIES) found.clear()
+    const fresh = { expires: now + FOUND_TTL, urls: davOnMailHosts([account.incoming.host, account.outgoing.host]).catch((): { caldav?: string, carddav?: string } => ({})) }
+    fresh.urls.then((urls) => {
+      if (!urls.caldav && !urls.carddav) fresh.expires = Date.now() + MISSED_TTL
+    })
+    entry = fresh
+    found.set(key, entry)
+  }
+  return entry.urls
+}
+
+async function serverUrlOf(account: AccountSettings, kind: Kind): Promise<string | undefined> {
+  const saved = kind === 'caldav' ? account.caldav : account.carddav
+  // '' is a service turned off in Settings: don't go looking for it
+  if (saved !== undefined) return saved.trim() || undefined
+  return (await foundOnMailHost(account))[kind]
 }
 
 async function connect(account: AccountSettings, kind: Kind, serverUrl: string): Promise<DavSession<{ url: string }>> {
@@ -120,7 +149,7 @@ function prune(now: number) {
 
 /** null when the account has no server of that kind */
 async function useDav<T extends { url: string }>(account: AccountSettings, kind: Kind): Promise<DavSession<T> | null> {
-  const serverUrl = serverUrlOf(account, kind)
+  const serverUrl = await serverUrlOf(account, kind)
   if (!serverUrl) {
     return null
   }

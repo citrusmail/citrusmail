@@ -296,6 +296,26 @@ async function wellKnownDav(domain: string, service: 'caldav' | 'carddav') {
   return found.protocol === 'https:' && baseDomain(found.hostname) === baseDomain(domain) ? found.toString() : undefined
 }
 
+/**
+ * Many mail servers (Stalwart, Mailcow, Faivelo and others) serve CalDAV and
+ * CardDAV on the mail host itself rather than on the address's domain, so
+ * this looks there: the incoming host first, then the outgoing one. Each URL
+ * has to stay on https and on that host's own domain, like wellKnownDav
+ */
+export async function davOnMailHosts(hosts: (string | undefined)[]): Promise<{ caldav?: string, carddav?: string }> {
+  const names = [...new Set(hosts.map(host => host?.trim().toLowerCase()).filter((host): host is string => !!host && /[a-z]/.test(host) && !host.includes(':')))]
+  let found: { caldav?: string, carddav?: string } = {}
+  for (const host of names) {
+    const [caldav, carddav] = await Promise.all([
+      found.caldav ? undefined : withTimeout(wellKnownDav(host, 'caldav')),
+      found.carddav ? undefined : withTimeout(wellKnownDav(host, 'carddav'))
+    ])
+    found = { caldav: found.caldav ?? caldav, carddav: found.carddav ?? carddav }
+    if (found.caldav && found.carddav) break
+  }
+  return found
+}
+
 /* ------------------------------------------------------------------ */
 /* Guessing                                                            */
 /* ------------------------------------------------------------------ */
@@ -345,7 +365,13 @@ export async function discover(email: string): Promise<DiscoveryResult> {
   const hit = cache.get(email)
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.result
 
-  const result = await publicOnly(await run(email))
+  let found = await run(email)
+  // The presets already say where their calendars are, or that there are none
+  if (found.incoming && (!found.caldav || !found.carddav) && found.source !== 'preset' && found.source !== 'mx') {
+    const onHost = await davOnMailHosts([found.incoming.host, found.outgoing?.host])
+    found = { ...found, caldav: found.caldav ?? onHost.caldav, carddav: found.carddav ?? onHost.carddav }
+  }
+  const result = await publicOnly(found)
   cache.set(email, { at: Date.now(), result })
   if (cache.size > 1000) cache.delete(cache.keys().next().value!)
   return result

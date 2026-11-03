@@ -16,11 +16,19 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
   const body = await readValidatedBody(event, schema)
   const locked = mailConfig().locked
 
+  // Emptying an address that was set turns that service off ('' is kept, so
+  // it isn't looked for again on the mail server); an address that was never
+  // set stays unset, so saving the name alone changes nothing else
+  const dav = (key: 'caldav' | 'carddav') => {
+    const value = body[key]
+    if (value === undefined || locked) return account[key]
+    return value || (account[key] ? '' : account[key])
+  }
   const next: AccountSettings = {
     ...account,
     name: body.name !== undefined ? body.name.trim() || undefined : account.name,
-    caldav: body.caldav !== undefined && !locked ? body.caldav || undefined : account.caldav,
-    carddav: body.carddav !== undefined && !locked ? body.carddav || undefined : account.carddav
+    caldav: dav('caldav'),
+    carddav: dav('carddav')
   }
 
   const [, ...others] = await sessionAccounts(event)

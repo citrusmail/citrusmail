@@ -113,7 +113,9 @@ export function assertAllowedDomain(email: string) {
 export async function discoverAccount(email: string): Promise<DiscoveryResult> {
   const config = mailConfig()
   if (config.incoming && config.outgoing) {
-    return { incoming: config.incoming, outgoing: config.outgoing, caldav: config.caldav, carddav: config.carddav, source: 'config' }
+    // Servers set in the environment: their calendars are where they say, or on the mail host
+    const onHost = config.caldav && config.carddav ? {} : await davOnMailHosts([config.incoming.host, config.outgoing.host])
+    return { incoming: config.incoming, outgoing: config.outgoing, caldav: config.caldav ?? onHost.caldav, carddav: config.carddav ?? onHost.carddav, source: 'config' }
   }
   const found = await discover(email)
   return {
