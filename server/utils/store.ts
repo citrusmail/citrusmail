@@ -23,15 +23,15 @@ const isSynced = (name: string): name is SyncedName => (SYNCED as readonly strin
 export type SyncMeta = Partial<Record<SyncedName, number>>
 
 export async function readLocal<T>(account: AccountSettings, name: string): Promise<T | null> {
-  return useStorage('letterbox').getItem<T>(storeKey(account, name))
+  return useStorage('citrusmail').getItem<T>(storeKey(account, name))
 }
 
 export async function writeLocal<T>(account: AccountSettings, name: string, value: T): Promise<void> {
-  await useStorage('letterbox').setItem(storeKey(account, name), value as never)
+  await useStorage('citrusmail').setItem(storeKey(account, name), value as never)
 }
 
 export async function removeLocal(account: AccountSettings, name: string): Promise<void> {
-  await useStorage('letterbox').removeItem(storeKey(account, name))
+  await useStorage('citrusmail').removeItem(storeKey(account, name))
 }
 
 export async function readStore<T>(account: AccountSettings, name: string, fallback: T): Promise<T> {

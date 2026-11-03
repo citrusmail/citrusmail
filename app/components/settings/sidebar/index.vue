@@ -13,7 +13,7 @@ const imap = computed(() => account.value?.protocol !== 'pop3')
 const items = computed<NavigationMenuItem[]>(() => [
   { label: 'Profile', icon: 'i-lucide-circle-user-round', to: '/settings/profile' },
   { label: 'Signature', icon: 'i-lucide-signature', to: '/settings/signature' },
-  ...(appConfig.letterbox.allowAppearance ? [{ label: 'Appearance', icon: 'i-lucide-palette', to: '/settings/appearance' }] : []),
+  ...(appConfig.citrusmail.allowAppearance ? [{ label: 'Appearance', icon: 'i-lucide-palette', to: '/settings/appearance' }] : []),
   { label: 'Reading', icon: 'i-lucide-book-open', to: '/settings/reading' },
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/settings/notifications' },
   // POP3 has no folders to file into

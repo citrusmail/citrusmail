@@ -13,7 +13,7 @@ export function describeConditions(rule: Pick<MailRule, 'conditions' | 'match'>)
     .join(rule.match === 'any' ? ' or ' : ' and ')
 }
 
-// Rules live on the Letterbox server, which runs them each time mail is checked
+// Rules live on the CitrusMail server, which runs them each time mail is checked
 export function useRules() {
   const toast = useToast()
   const overlay = useOverlay()

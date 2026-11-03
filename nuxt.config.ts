@@ -48,12 +48,8 @@ export default defineNuxtConfig({
       allowPrivateHosts: false
     },
     public: {
-      // The old name of NUXT_PUBLIC_CITRUSMAIL_THEME, still read. A JSON theme override, e.g. NUXT_PUBLIC_LETTERBOX_THEME='{"primary":"#7c3aed","radius":"0"}'.
-      // Same keys as `letterbox.theme` in app.config.ts; no rebuild needed
-      letterbox: {
-        theme: {}
-      },
-      // NUXT_PUBLIC_CITRUSMAIL_THEME: the same, under the app's name. Wins over the old one
+      // NUXT_PUBLIC_CITRUSMAIL_THEME: a JSON theme override, e.g. '{"primary":"#7c3aed","radius":"0"}'.
+      // Same keys as `citrusmail.theme` in app.config.ts; no rebuild needed
       citrusmail: {
         theme: {}
       },
@@ -83,12 +79,12 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2026-06-30',
 
-  // Signatures and rules are the only things Letterbox keeps itself, one small
+  // Signatures and rules are the only things CitrusMail keeps itself, one small
   // JSON file per account. Point this at Redis, S3 or any unstorage driver to
   // run on a host without a disk
   nitro: {
     storage: {
-      letterbox: { driver: 'fs', base: './.data/letterbox' }
+      citrusmail: { driver: 'fs', base: './.data/citrusmail' }
     }
   },
 

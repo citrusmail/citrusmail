@@ -1,11 +1,11 @@
-import type { LetterboxTheme } from './utils/theme'
+import type { CitrusMailTheme } from './utils/theme'
 
 // Desk & Sheet: the app is a desk with one sheet of paper on it. Surfaces are
 // separated by hairlines, never by shadows; only things that float over the
 // sheet (menus, dialogs) get a single, short shadow so they read as lifted.
 //
-// Everything visual below `letterbox.theme` is a plain CSS value and can be
-// changed here, with NUXT_PUBLIC_LETTERBOX_THEME at runtime, or per person in
+// Everything visual below `citrusmail.theme` is a plain CSS value and can be
+// changed here, with NUXT_PUBLIC_CITRUSMAIL_THEME at runtime, or per person in
 // Settings → Appearance. Component-level changes go in `ui`. See THEMING.md
 const hairline = 'ring ring-default'
 const floating = `bg-default ${hairline} shadow-(--lb-shadow)`
@@ -15,7 +15,7 @@ const overlay = 'bg-(--lb-overlay)'
 const n = (shade: number) => `var(--ui-color-neutral-${shade})`
 const mix = (a: string, b: string, amount: number) => `color-mix(in oklab, ${a}, ${b} ${amount}%)`
 
-const theme: LetterboxTheme = {
+const theme: CitrusMailTheme = {
   primary: 'post',
   neutral: 'stone',
   unread: '',
@@ -58,7 +58,7 @@ const theme: LetterboxTheme = {
 }
 
 export default defineAppConfig({
-  letterbox: {
+  citrusmail: {
     /** Shown in the sidebar, the sign-in page and the browser tab */
     name: 'CitrusMail',
     /** A small line under the name; empty for none */

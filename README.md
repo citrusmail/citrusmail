@@ -94,11 +94,11 @@ Run your own copy under your own name without forking: everything below is read 
 
 Put your images and a `custom.css` in the brand folder (in Docker, mount it at `/app/brand` or set `NUXT_BRAND_DIR`). Files there are read on each request, so they can change without a rebuild. `custom.css` loads after everything else and can restyle anything, the sign-in page included.
 
-The same settings can be baked in with `letterbox` in `app/app.config.ts`, and each person can still pick an accent, font, text size and corners in Settings → Appearance. See [THEMING.md](THEMING.md) for every theme key and CSS token.
+The same settings can be baked in with `citrusmail` in `app/app.config.ts`, and each person can still pick an accent, font, text size and corners in Settings → Appearance. See [THEMING.md](THEMING.md) for every theme key and CSS token.
 
 ## What CitrusMail stores
 
-CitrusMail has no database. Your password lives only in an encrypted cookie in your browser. Signatures, rules, profile pictures and appearance choices are kept as one small JSON file per account in `.data/letterbox`. The few secrets the server has to keep between visits (messages waiting to be sent later, AI keys and push subscriptions) are encrypted there with a key made from `NUXT_APP_SECRET` and a random key of its own, so neither the disk nor the environment alone can open them. To keep them somewhere else (Redis, S3, any [unstorage](https://unstorage.unjs.io) driver), change `nitro.storage.letterbox` in `nuxt.config.ts`.
+CitrusMail has no database. Your password lives only in an encrypted cookie in your browser. Signatures, rules, profile pictures and appearance choices are kept as one small JSON file per account in `.data/citrusmail`. The few secrets the server has to keep between visits (messages waiting to be sent later, AI keys and push subscriptions) are encrypted there with a key made from `NUXT_APP_SECRET` and a random key of its own, so neither the disk nor the environment alone can open them. To keep them somewhere else (Redis, S3, any [unstorage](https://unstorage.unjs.io) driver), change `nitro.storage.citrusmail` in `nuxt.config.ts`.
 
 ## Keyboard
 

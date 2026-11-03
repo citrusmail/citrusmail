@@ -4,14 +4,14 @@ Everything you see is themeable, from the accent color down to the 2px edge on t
 
 | Where | What it's for | Rebuild? |
 | --- | --- | --- |
-| `letterbox` in `app/app.config.ts` | Your instance's look: colors, fonts, corners, surfaces, shadows, name and logo | Yes |
+| `citrusmail` in `app/app.config.ts` | Your instance's look: colors, fonts, corners, surfaces, shadows, name and logo | Yes |
 | `NUXT_PUBLIC_CITRUSMAIL_THEME` | The same keys as JSON, for Docker and other hosts | No |
 | `NUXT_PUBLIC_BRAND_*` | Name, logo, favicon, sign-in text and image | No |
 | `brand/custom.css` | Any CSS at all, loaded after everything else | No (read on each request) |
 | `ui` in `app/app.config.ts` | Per-component styling: button variants, menu padding, modal size | Yes |
 | Settings → Appearance | Each person's own accent, font, text size, corners and light/dark | No |
 
-Values are applied in that order, so a person's Appearance choice wins over the environment variable, which wins over `app.config.ts`. `custom.css` is loaded last and can override all of them. `NUXT_PUBLIC_LETTERBOX_THEME`, the variable's old name, still works.
+Values are applied in that order, so a person's Appearance choice wins over the environment variable, which wins over `app.config.ts`. `custom.css` is loaded last and can override all of them.
 
 ## 1. The theme object
 
@@ -19,7 +19,7 @@ Values are applied in that order, so a person's Appearance choice wins over the 
 
 ```ts
 export default defineAppConfig({
-  letterbox: {
+  citrusmail: {
     name: 'Acme Mail',
     logo: '/acme.svg',            // in public/; replaces the built-in mark
     allowAppearance: true,        // false hides Settings → Appearance
@@ -67,7 +67,7 @@ The defaults are mixed from the `neutral` palette, so changing `neutral` re-tint
 CitrusMail self-hosts its fonts through `@nuxt/fonts`, so no visitor's browser contacts Google. To use a new family, add it in two places:
 
 1. `fonts.families` in `nuxt.config.ts`
-2. `letterbox.fonts` in `app.config.ts`, which lists the choices Settings → Appearance offers
+2. `citrusmail.fonts` in `app.config.ts`, which lists the choices Settings → Appearance offers
 
 A family is only downloaded when someone uses it.
 
@@ -81,7 +81,7 @@ NUXT_PUBLIC_CITRUSMAIL_THEME='{"primary":"#0f766e","neutral":"slate","radius":"0
 
 ### Name, logo and sign-in page
 
-`NUXT_PUBLIC_BRAND_NAME`, `_LOGO`, `_LOGO_DARK`, `_FAVICON`, `_LOGIN_TITLE`, `_LOGIN_SUBTITLE` and `_LOGIN_IMAGE` (an image URL, or `none`) override the matching keys in `letterbox` in `app.config.ts`. The README lists what each one does.
+`NUXT_PUBLIC_BRAND_NAME`, `_LOGO`, `_LOGO_DARK`, `_FAVICON`, `_LOGIN_TITLE`, `_LOGIN_SUBTITLE` and `_LOGIN_IMAGE` (an image URL, or `none`) override the matching keys in `citrusmail` in `app.config.ts`. The README lists what each one does.
 
 ## 3. The brand folder and custom CSS
 
@@ -136,4 +136,4 @@ Each component's page in the Nuxt UI docs lists its slots and variants under "Th
 
 ## 5. Per person
 
-Settings → Appearance lets each person pick light or dark, an accent (presets or any color), a font from `letterbox.fonts`, a text size and corner style. Their choices are saved with their account and follow them to other devices. Set `allowAppearance: false` to give everyone the instance's look.
+Settings → Appearance lets each person pick light or dark, an accent (presets or any color), a font from `citrusmail.fonts`, a text size and corner style. Their choices are saved with their account and follow them to other devices. Set `allowAppearance: false` to give everyone the instance's look.

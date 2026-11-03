@@ -17,7 +17,7 @@ function criteriaFor(rule: MailRule, validity: string): SearchObject | undefined
 
 /**
  * Files Inbox mail into folders by the account's rules, using the server's own
- * SEARCH so nothing is downloaded. Runs whenever Letterbox checks for mail
+ * SEARCH so nothing is downloaded. Runs whenever CitrusMail checks for mail
  */
 // The Inbox as rules last left it. Every search costs a round trip, so with
 // nothing new since then the rules don't run at all

@@ -1,5 +1,5 @@
 /**
- * Letterbox's look, as data. Every value is a CSS value (a color, a length, a
+ * CitrusMail's look, as data. Every value is a CSS value (a color, a length, a
  * shadow, a font stack), so anything CSS can do is allowed. Defaults live in
  * `app/app.config.ts`; `NUXT_PUBLIC_CITRUSMAIL_THEME` (JSON) overrides them
  * without a rebuild; each person's Appearance settings go on top of both.
@@ -30,7 +30,7 @@ export interface ThemeColors {
   overlay: string
 }
 
-export interface LetterboxTheme {
+export interface CitrusMailTheme {
   /** Accent: a hex color, or a Tailwind palette name such as 'violet' */
   primary: string
   /** Greys: a Tailwind palette name ('stone', 'zinc', 'slate', 'gray', 'neutral') */
@@ -63,7 +63,7 @@ export interface Appearance {
   radius?: string
 }
 
-export type ThemeOverride = Partial<Omit<LetterboxTheme, 'light' | 'dark'>> & {
+export type ThemeOverride = Partial<Omit<CitrusMailTheme, 'light' | 'dark'>> & {
   light?: Partial<ThemeColors>
   dark?: Partial<ThemeColors>
 }
@@ -80,8 +80,8 @@ export function isHexColor(value?: string): value is string {
   return !!value && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
 }
 
-export function mergeTheme(base: LetterboxTheme, ...overrides: (ThemeOverride | undefined)[]): LetterboxTheme {
-  return overrides.reduce<LetterboxTheme>((theme, override) => {
+export function mergeTheme(base: CitrusMailTheme, ...overrides: (ThemeOverride | undefined)[]): CitrusMailTheme {
+  return overrides.reduce<CitrusMailTheme>((theme, override) => {
     if (!override || typeof override !== 'object') return theme
     const clean = Object.fromEntries(Object.entries(override).filter(([, value]) => value !== undefined && value !== ''))
     return {
@@ -117,7 +117,7 @@ const block = (selector: string, vars: Record<string, string | undefined>) =>
   `${selector} {\n${Object.entries(vars).filter(([, value]) => value).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}`
 
 /** The whole theme as CSS custom properties, light and dark */
-export function themeCss(theme: LetterboxTheme, builtInPalettes: Set<string>): string {
+export function themeCss(theme: CitrusMailTheme, builtInPalettes: Set<string>): string {
   const shades = (value: (shade: number) => string) => Object.fromEntries(SHADES.map(shade => [`--ui-color-primary-${shade}`, value(shade)]))
   // A hex is mixed into a scale; a palette of our own (declared with @theme in
   // main.css, like 'post') is spelled out, since Nuxt UI only resolves

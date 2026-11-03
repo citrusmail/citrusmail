@@ -1,10 +1,10 @@
 import colors from 'tailwindcss/colors'
-import type { Appearance, LetterboxTheme, ThemeOverride } from '~/utils/theme'
+import type { Appearance, CitrusMailTheme, ThemeOverride } from '~/utils/theme'
 
 const BUILT_IN = new Set(Object.keys(colors))
 
 /**
- * Applies the theme: app.config defaults, then NUXT_PUBLIC_CITRUSMAIL_THEME (or the old NUXT_PUBLIC_LETTERBOX_THEME),
+ * Applies the theme: app.config defaults, then NUXT_PUBLIC_CITRUSMAIL_THEME,
  * then the person's own Appearance choices (remembered in this browser so the
  * first paint is already right). Written as CSS custom properties
  */
@@ -14,9 +14,9 @@ export default defineNuxtPlugin(() => {
   const pickTheme = (value?: ThemeOverride | string) => typeof value === 'string' ? value.trim() : value && Object.keys(value).length ? value : undefined
   const runtime = {
     theme: pickTheme((config.citrusmail as { theme?: ThemeOverride | string } | undefined)?.theme)
-      ?? pickTheme((config.letterbox as { theme?: ThemeOverride | string } | undefined)?.theme)
   }
-  const appearance = useLocalStorage<Appearance>('letterbox-appearance', {})
+  renameStoredKey('letterbox-appearance', 'citrusmail-appearance')
+  const appearance = useLocalStorage<Appearance>('citrusmail-appearance', {})
 
   const envTheme = computed<ThemeOverride | undefined>(() => {
     const value = runtime.theme
@@ -30,10 +30,10 @@ export default defineNuxtPlugin(() => {
     }
   })
 
-  const theme = computed<LetterboxTheme>(() => mergeTheme(
-    appConfig.letterbox.theme as LetterboxTheme,
+  const theme = computed<CitrusMailTheme>(() => mergeTheme(
+    appConfig.citrusmail.theme as CitrusMailTheme,
     envTheme.value,
-    appConfig.letterbox.allowAppearance ? appearance.value : undefined
+    appConfig.citrusmail.allowAppearance ? appearance.value : undefined
   ))
 
   // Palette names go through Nuxt UI, which knows every Tailwind color; a hex
@@ -45,9 +45,9 @@ export default defineNuxtPlugin(() => {
   })
 
   useHead({
-    style: [{ id: 'letterbox-theme', innerHTML: () => themeCss(theme.value, BUILT_IN), tagPriority: 'low' }],
+    style: [{ id: 'citrusmail-theme', innerHTML: () => themeCss(theme.value, BUILT_IN), tagPriority: 'low' }],
     // Loaded last, so brand/custom.css (served by server/routes/custom.css.ts) wins over everything
-    link: [{ rel: 'stylesheet', href: '/custom.css', key: 'letterbox-custom', tagPriority: 'low' }]
+    link: [{ rel: 'stylesheet', href: '/custom.css', key: 'citrusmail-custom', tagPriority: 'low' }]
   })
 
   return { provide: { appearance, theme } }

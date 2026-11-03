@@ -236,7 +236,7 @@ function setTimes(item: ICAL.Event, event: CalendarEvent, zone: string) {
 /** A new VCALENDAR holding one event, its UID being the event id */
 export function eventToCalendar(event: CalendarEvent, zone: string): string {
   const calendar = new ICAL.Component(['vcalendar', [], []])
-  calendar.updatePropertyWithValue('prodid', '-//Letterbox//EN')
+  calendar.updatePropertyWithValue('prodid', '-//CitrusMail//EN')
   calendar.updatePropertyWithValue('version', '2.0')
 
   const vevent = new ICAL.Component('vevent')

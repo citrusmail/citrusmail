@@ -152,7 +152,7 @@ function stamp(card: Component) {
 export function contactToVcard(contact: ContactFields, uid: string): string {
   const card = new ICAL.Component('vcard')
   card.updatePropertyWithValue('version', '3.0')
-  card.updatePropertyWithValue('prodid', '-//Letterbox//EN')
+  card.updatePropertyWithValue('prodid', '-//CitrusMail//EN')
   card.updatePropertyWithValue('uid', uid)
   applyFields(card, contact)
   stamp(card)

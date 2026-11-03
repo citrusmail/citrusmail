@@ -1,7 +1,7 @@
 type BrandKey = 'name' | 'byline' | 'logo' | 'logoDark' | 'favicon' | 'loginTitle' | 'loginSubtitle' | 'loginImage'
 
 /**
- * The instance's brand: `letterbox` in app.config.ts, overridden at runtime by
+ * The instance's brand: `citrusmail` in app.config.ts, overridden at runtime by
  * NUXT_PUBLIC_BRAND_* (no rebuild)
  */
 export function useBrand() {
@@ -11,7 +11,7 @@ export function useBrand() {
   const locked = !!(config.mail as { locked?: boolean } | undefined)?.locked
 
   return computed(() => {
-    const base = appConfig.letterbox
+    const base = appConfig.citrusmail
     const pick = (key: BrandKey) => env?.[key]?.trim() || base[key] || ''
     const name = pick('name')
     const byline = pick('byline')

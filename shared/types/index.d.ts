@@ -330,7 +330,7 @@ export interface UserSettings {
   /** 'rich' was written in the editor, 'html' was pasted as source */
   signatureMode: 'rich' | 'html'
   signatureOnReplies: boolean
-  /** A small square JPEG as a data URL, shown on your messages in Letterbox */
+  /** A small square JPEG as a data URL, shown on your messages in CitrusMail */
   avatar?: string
   /** Settings → Appearance: accent, font, text size and corners */
   appearance?: { primary?: string, font?: string, fontSize?: string, radius?: string, background?: BackgroundSettings }

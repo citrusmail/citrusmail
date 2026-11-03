@@ -4,8 +4,8 @@ const colorMode = useColorMode()
 const { $appearance } = useNuxtApp()
 const { save } = useSettings()
 
-const theme = appConfig.letterbox.theme
-const fonts = computed(() => appConfig.letterbox.fonts.map(font => ({ ...font, style: { fontFamily: font.value } })))
+const theme = appConfig.citrusmail.theme
+const fonts = computed(() => appConfig.citrusmail.fonts.map(font => ({ ...font, style: { fontFamily: font.value } })))
 
 // Changes show at once and are saved a moment later
 function set<K extends keyof Appearance>(key: K, value: Appearance[K]) {

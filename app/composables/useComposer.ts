@@ -67,12 +67,14 @@ const _useComposer = () => {
 
   const open = ref(false)
   const sending = ref(false)
-  const draft = useLocalStorage<Draft>('letterbox-draft', emptyDraft(), { mergeDefaults: true })
+  renameStoredKey('letterbox-draft', 'citrusmail-draft')
+  renameStoredKey('letterbox-draft-baseline', 'citrusmail-draft-baseline')
+  const draft = useLocalStorage<Draft>('citrusmail-draft', emptyDraft(), { mergeDefaults: true })
   // Bumped whenever the draft is replaced wholesale, so the editor remounts
   // with the new content instead of keeping what it had
   const version = ref(0)
   // The draft as it was handed to the composer, so prefilled replies don't count as changes
-  const baseline = useLocalStorage('letterbox-draft-baseline', '')
+  const baseline = useLocalStorage('citrusmail-draft-baseline', '')
   const isDirty = computed(() => fingerprint(draft.value) !== baseline.value)
 
   // The editor registers itself, so the subject's Tab can land in it
@@ -167,7 +169,7 @@ const _useComposer = () => {
     // keeps its height as a blank line in the recipient's client
     const body = html.replace(/<p><\/p>/g, '<p><br></p>').replace(/<p>/g, '<p style="margin:0">')
     const parts = [body]
-    if (signature && settings.value.signature) parts.push(`<br><div class="letterbox-signature">${settings.value.signature}</div>`)
+    if (signature && settings.value.signature) parts.push(`<br><div class="citrusmail-signature">${settings.value.signature}</div>`)
     if (quote) parts.push(quote)
     return parts.join('')
   }

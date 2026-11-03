@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // For signatures made in a generator: the HTML as is, with a live preview in
-// a sandbox so its styles can't leak into Letterbox
+// a sandbox so its styles can't leak into CitrusMail
 const html = defineModel<string>({ required: true })
 
 const preview = computed(() => `<!doctype html><html><head><meta charset="utf-8"><style>
