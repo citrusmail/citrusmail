@@ -47,8 +47,12 @@ module.exports = {
     icon,
     // Ad-hoc signed ("-") unless CSC_NAME / CSC_LINK name a Developer ID: the
     // fuses change the binary, and macOS kills an app whose signature no
-    // longer matches. Ad-hoc builds need right-click → Open on other Macs
+    // longer matches. Ad-hoc builds need Open Anyway on other Macs
     identity: process.env.CSC_NAME || process.env.CSC_LINK ? undefined : '-',
+    hardenedRuntime: true,
+    // Notarized when Apple credentials are in the environment, for example
+    // APPLE_KEYCHAIN_PROFILE from `xcrun notarytool store-credentials`
+    notarize: !!(process.env.APPLE_KEYCHAIN_PROFILE || process.env.APPLE_API_KEY || process.env.APPLE_ID),
     target: [
       { target: 'dmg', arch: ['arm64', 'x64'] },
       { target: 'zip', arch: ['arm64', 'x64'] }
