@@ -1,0 +1,393 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  /* Set at runtime from the theme's `font` */
+  --font-sans: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
+
+  /* Postal green: the one accent. It marks what needs you (unread, send, a
+     link) and nothing else, so it never has to compete for attention */
+  --color-post-50: #EDFAF4;
+  --color-post-100: #D3F2E4;
+  --color-post-200: #A9E4CB;
+  --color-post-300: #72CFAB;
+  --color-post-400: #3BB488;
+  --color-post-500: #17976C;
+  --color-post-600: #0C7A57;
+  --color-post-700: #0B6248;
+  --color-post-800: #0C4E3B;
+  --color-post-900: #0B4032;
+  --color-post-950: #04241C;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--ui-primary) 18%, transparent);
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "tnum" 0;
+  }
+}
+
+/* Colors, fonts, corners, borders and shadows come from the theme
+   (app/app.config.ts → app/plugins/theme.client.ts). What's left here are the
+   calendar template's tokens, flattened to paper: opaque, no blur */
+:root {
+  --glass-bg: var(--ui-bg);
+  --glass-filter: none;
+  --overlay-blur: 0px;
+  --control-bg: var(--ui-bg-elevated);
+  --control-bg-hover: var(--ui-bg-accented);
+  --weekend-bg: color-mix(in oklab, var(--ui-color-neutral-900) 2.2%, transparent);
+  --glass-control-bg: var(--ui-bg);
+  --glass-control-bg-hover: var(--ui-bg-elevated);
+  --glass-control-shadow: none;
+
+  /* Initials avatars: six soft tints, picked per address */
+  --lb-avatar-1: #E9E2D8; --lb-avatar-1-text: #6B5536;
+  --lb-avatar-2: #DCE6E0; --lb-avatar-2-text: #3E5D4C;
+  --lb-avatar-3: #E4E0EC; --lb-avatar-3-text: #5A4D78;
+  --lb-avatar-4: #EFDDDA; --lb-avatar-4-text: #7C4238;
+  --lb-avatar-5: #DBE4EC; --lb-avatar-5-text: #3D5A73;
+  --lb-avatar-6: #EAE5CF; --lb-avatar-6-text: #675B23;
+
+  /* The section switch: a recessed track with a raised paper tab */
+  --lb-tab-track: color-mix(in oklab, var(--ui-color-neutral-900) 6%, transparent);
+  --lb-tab-ring: color-mix(in oklab, var(--ui-color-neutral-900) 7%, transparent);
+  --lb-tab-active: var(--ui-bg);
+
+  /* The composer line that has the cursor */
+  --lb-field-active: color-mix(in oklab, var(--ui-primary) 4%, transparent);
+
+  /* AI: its own quiet violet, so written-by-AI never reads as the accent's "needs you" */
+  --lb-ai: #7C5CD6;
+  --lb-ai-bg: color-mix(in oklab, #7C5CD6 5%, var(--ui-bg));
+}
+
+.dark {
+  --weekend-bg: rgb(0 0 0 / 0.14);
+  --lb-avatar-1: #3A3227; --lb-avatar-1-text: #E3D3BC;
+  --lb-avatar-2: #26352D; --lb-avatar-2-text: #C3DCCD;
+  --lb-avatar-3: #302B3D; --lb-avatar-3-text: #D6CDEB;
+  --lb-avatar-4: #3F2925; --lb-avatar-4-text: #EFC9C1;
+  --lb-avatar-5: #24313C; --lb-avatar-5-text: #C3D6E6;
+  --lb-avatar-6: #38331C; --lb-avatar-6-text: #E5DAA6;
+  --lb-tab-track: rgb(0 0 0 / 0.22);
+  --lb-tab-ring: rgb(255 255 255 / 0.06);
+  --lb-tab-active: color-mix(in oklab, var(--ui-bg) 70%, var(--ui-color-neutral-700));
+  --lb-ai: #B4A0F5;
+  --lb-ai-bg: color-mix(in oklab, #B4A0F5 7%, var(--ui-bg));
+}
+
+html {
+  font-size: var(--lb-font-size, 16px);
+}
+
+/* Kept as no-ops so the calendar template's markup needs no edits */
+@utility glass-material {
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+
+@utility glass-control {
+  box-shadow: var(--glass-control-shadow);
+}
+
+/* Prose inside the composer and quoted replies: a quote is a ruled-off
+   block in the same voice, not an italic aside */
+.ProseMirror blockquote {
+  border-inline-start: 2px solid var(--ui-border-accented);
+  padding-inline-start: 0.875rem;
+  margin-inline: 0;
+  color: var(--ui-text-muted);
+  font-style: normal;
+}
+
+/* Slide the calendar grid on prev/next navigation, driven by the
+   `data-nav-direction` attribute set in `useCalendar` */
+::view-transition-old(calendar),
+::view-transition-new(calendar) {
+  animation-duration: 200ms;
+  animation-timing-function: ease;
+}
+
+html[data-nav-direction='right']::view-transition-old(calendar) {
+  animation-name: calendar-out-start;
+}
+
+html[data-nav-direction='right']::view-transition-new(calendar) {
+  animation-name: calendar-in-end;
+}
+
+html[data-nav-direction='left']::view-transition-old(calendar) {
+  animation-name: calendar-out-end;
+}
+
+html[data-nav-direction='left']::view-transition-new(calendar) {
+  animation-name: calendar-in-start;
+}
+
+/* The blurred chrome rides along in the transition overlay so it keeps
+   blurring the sliding grid instead of being painted over by it, and swaps
+   outright the way it does outside a transition */
+::view-transition-old(header),
+::view-transition-old(weekdays) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(header),
+::view-transition-new(weekdays) {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes calendar-out-start {
+  to {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+}
+
+@keyframes calendar-in-end {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+}
+
+@keyframes calendar-out-end {
+  to {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+}
+
+@keyframes calendar-in-start {
+  from {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Quoted mail keeps its structure but not its volume */
+.ProseMirror blockquote :is(h1, h2, h3, h4) {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+
+/* The check that replaces an action's icon once it's done */
+@keyframes reveal-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* ---------------------------------------------------------------- */
+/* Motion that answers what you did. All of it stops for reduced motion */
+
+/* Cc and Bcc rows unfold into place */
+.lb-row-enter-active,
+.lb-row-leave-active {
+  transition: max-height 220ms cubic-bezier(.2, .8, .2, 1), opacity 180ms ease;
+  overflow: hidden;
+}
+.lb-row-enter-from,
+.lb-row-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+.lb-row-enter-to,
+.lb-row-leave-from {
+  max-height: 6rem;
+}
+
+/* Utilities rather than plain classes, so Tailwind (and its linter) know them.
+   Each stops moving for reduced motion */
+
+/* A drawer that opens to its content's height: recipients under a sender,
+   a provider's key form */
+@utility lb-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms cubic-bezier(.2, .8, .2, 1), opacity 200ms ease;
+  opacity: 0;
+  & > * {
+    min-height: 0;
+    overflow: hidden;
+  }
+  &[data-open="true"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  &[data-open="true"] :is(dd, dt) {
+    animation: lb-rise 260ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  &[data-open="true"] :is(:nth-child(3), :nth-child(4)) { animation-delay: 40ms; }
+  &[data-open="true"] :is(:nth-child(5), :nth-child(6)) { animation-delay: 80ms; }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &[data-open="true"] :is(dd, dt) { animation: none; }
+  }
+}
+
+@keyframes lb-rise {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Files dragged over the composer */
+@utility lb-drop-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  text-align: center;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 2px dashed color-mix(in oklab, var(--ui-primary) 45%, transparent);
+  background: color-mix(in oklab, var(--ui-bg) 88%, var(--ui-primary));
+  color: var(--ui-primary);
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  &:hover, &:has(*:hover) {
+    border-style: solid;
+    border-color: var(--ui-primary);
+    background: color-mix(in oklab, var(--ui-bg) 78%, var(--ui-primary));
+    transform: scale(1.01);
+  }
+  & * { pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+.lb-drop-enter-active,
+.lb-drop-leave-active { transition: opacity 140ms ease; }
+.lb-drop-enter-from,
+.lb-drop-leave-to { opacity: 0; }
+
+.lb-chip-enter-active { transition: opacity 180ms ease, transform 180ms cubic-bezier(.2, .8, .2, 1); }
+.lb-chip-enter-from { opacity: 0; transform: scale(0.92); }
+
+/* AI writing: a travelling line above, a caret after the last word */
+@utility lb-ai-progress {
+  background: linear-gradient(90deg, transparent, var(--lb-ai), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: lb-ai-sweep 1.3s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-size: 100% 100%;
+  }
+}
+@keyframes lb-ai-sweep {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+@utility lb-ai-dots {
+  &::after {
+    content: '';
+    display: inline-block;
+    width: 1.2em;
+    text-align: start;
+    animation: lb-ai-dots 1.2s steps(4, end) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::after { animation: none; content: '...'; }
+  }
+}
+@keyframes lb-ai-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+@utility lb-ai-writing {
+  & .ProseMirror > p:last-child::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    margin-inline-start: 2px;
+    vertical-align: text-bottom;
+    background: var(--lb-ai);
+    animation: lb-caret 900ms steps(2, start) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & .ProseMirror > p:last-child::after { animation: none; }
+  }
+}
+@keyframes lb-caret {
+  to { visibility: hidden; }
+}
+
+/* Your reply being translated: the same wave as a message, paragraph by paragraph */
+@utility lb-tr-editing {
+  & .ProseMirror > * {
+    background-image: linear-gradient(100deg, currentColor 0 38%, var(--ui-primary) 47%, color-mix(in oklab, var(--ui-primary) 55%, white) 50%, var(--ui-primary) 53%, currentColor 62% 100%);
+    background-size: 260% 100%;
+    background-position: 100% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: lb-tr-wave 2.2s cubic-bezier(.45, .05, .35, 1) infinite both;
+  }
+  & .ProseMirror > :nth-child(2) { animation-delay: .15s; }
+  & .ProseMirror > :nth-child(3) { animation-delay: .3s; }
+  & .ProseMirror > :nth-child(4) { animation-delay: .45s; }
+  & .ProseMirror > :nth-child(n + 5) { animation-delay: .6s; }
+  @media (prefers-reduced-motion: reduce) {
+    & .ProseMirror > * { animation: none; -webkit-text-fill-color: currentColor; background: none; opacity: .55; }
+  }
+}
+@keyframes lb-tr-wave {
+  0% { background-position: 100% 0; }
+  55%, 100% { background-position: 0 0; }
+}
+
+/* An AI summary, written in as it arrives */
+.lb-summary-enter-active { transition: opacity 200ms ease, transform 220ms cubic-bezier(.2, .8, .2, 1); }
+.lb-summary-enter-from { opacity: 0; transform: translateY(-4px); }
+
+/* A message opening over the list (list view) */
+@utility lb-reader-enter {
+  animation: lb-slide-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@keyframes lb-slide-in {
+  from { opacity: 0; transform: translateX(12px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-row-enter-active, .lb-row-leave-active, .lb-drop-enter-active, .lb-drop-leave-active,
+  .lb-chip-enter-active, .lb-summary-enter-active { transition: none; }
+}
+
+/* ---------------------------------------------------------------- */
+/* Your own picture behind the app (Settings → Appearance). The desk turns
+   translucent over it; the sheet you read on stays solid */
+/* One layer for the whole desk: the sidebar draws no tint of its own on
+   desktop, so beside, above and below the sheet all match */
+html.lb-has-background {
+  --lb-desk: color-mix(in oklab, var(--lb-desk-solid) 82%, transparent);
+}
+html.lb-has-background.dark {
+  --lb-desk: color-mix(in oklab, var(--lb-desk-solid) 78%, transparent);
+}

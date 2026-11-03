@@ -1,0 +1,10 @@
+/*
+ * Your own styles, loaded after everything else. This folder (brand/, or
+ * NUXT_BRAND_DIR) is read while the server runs, so edit this file, or mount
+ * your own brand folder in Docker, and reload: no rebuild. Put your logo,
+ * favicon and sign-in image here too and point NUXT_PUBLIC_BRAND_* at
+ * /brand/<file>. Every token is a CSS custom property; see THEMING.md.
+ *
+ * :root { --ui-radius: 0; --lb-sheet-inset: 0; }
+ * .dark { --lb-desk: #000; }
+ */

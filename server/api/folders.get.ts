@@ -1,0 +1,5 @@
+import { defineEventHandler } from 'nuxt/server'
+
+export default defineEventHandler(event =>
+  withAccount(event, (account): Promise<Folder[]> => mailFor(account).listFolders())
+)

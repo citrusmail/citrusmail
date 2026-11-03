@@ -1,0 +1,24 @@
+allowBuilds:
+  '@parcel/watcher': false
+  '@tailwindcss/oxide': false
+  electron: true
+  electron-winstaller: false
+  esbuild: false
+  unrs-resolver: false
+  vue-demi: false
+
+minimumReleaseAgeExclude:
+  - gpu-time@0.3.0
+
+# Patched versions of build-time tools with advisories. None of these ship in
+# the app (.output); this keeps `pnpm audit` clean
+overrides:
+  node-forge@<1.4.1: ^1.4.1
+  shell-quote@>=1.8.4 <1.11.0: ^1.11.0
+  brace-expansion@>=2.0.0 <2.1.7: ^2.1.7
+  brace-expansion@>=4.0.0 <5.0.12: ^5.0.12
+  glob@>=9.0.0 <=14.0.1: ^14.0.2
+  serialize-javascript@<7.1.3: ^7.1.3
+  esbuild@>=0.27.3 <0.28.1: ^0.28.1
+  js-yaml@>=4.0.0 <4.3.2: ^4.3.2
+  postcss-selector-parser@>=7.0.0 <7.1.6: ^7.1.6

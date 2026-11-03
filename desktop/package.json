@@ -1,0 +1,10 @@
+{
+  "name": "citrusmail",
+  "productName": "CitrusMail",
+  "version": "0.1.0",
+  "description": "CitrusMail for Mac",
+  "author": "CitrusMail contributors",
+  "license": "MIT",
+  "type": "module",
+  "main": "main.mjs"
+}
