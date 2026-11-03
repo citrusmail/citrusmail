@@ -2,7 +2,7 @@
 // runs inside this process on a local port, and one window shows it. Mail
 // passwords still live only in the sealed session cookie, now in this app's
 // own browser profile, and settings land in the app's data folder
-import { app, BrowserWindow, nativeTheme, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, Notification, session, shell } from 'electron'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -187,12 +187,7 @@ function openWindow() {
   win.loadURL(`${origin}/mail/INBOX`)
 }
 
-app.on('second-instance', () => {
-  if (!win) return
-  if (win.isMinimized()) win.restore()
-  win.show()
-  win.focus()
-})
+app.on('second-instance', () => win && showWindow())
 
 // On a Mac the app stays open with no windows, and the Dock icon reopens one
 app.on('window-all-closed', () => {
@@ -201,6 +196,37 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (win) win.show()
   else if (origin) openWindow()
+})
+
+/** Brings the window back (it may be hidden behind a closed window) and in front */
+function showWindow() {
+  if (!win) return openWindow()
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  app.focus({ steal: true })
+}
+
+// New-mail banners come from this process, so they show with the app's own
+// icon and name, work with the window closed, and clicking one brings the
+// window back. Only the app's own page may ask for one
+const text = (value, max) => (typeof value === 'string' ? value : '').replace(/\s+/g, ' ').trim().slice(0, max)
+ipcMain.handle('citrusmail:notify', (event, notice) => {
+  if (!win || event.sender !== win.webContents || !isOurs(event.sender.getURL())) return false
+  if (!Notification.isSupported()) return false
+  const title = text(notice?.title, 120) || appName
+  const body = text(notice?.body, 240)
+  const open = notice?.open && typeof notice.open === 'object'
+    ? { mailbox: text(notice.open.mailbox, 254), folder: text(notice.open.folder, 500), id: text(notice.open.id, 100) }
+    : undefined
+  // The app plays its own sound (Settings → Notifications), so the system stays quiet
+  const banner = new Notification({ title, body, silent: true })
+  banner.on('click', () => {
+    showWindow()
+    if (open && win) win.webContents.send('citrusmail:open', open)
+  })
+  banner.show()
+  return true
 })
 
 function lockDownSession() {
