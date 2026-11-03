@@ -30,14 +30,18 @@ const active = computed(() => tabs.value.findIndex(tab => tab.value === (pending
 // is always three columns wide and only ever slides
 const columns = computed(() => tabs.value.map((_, i) => i === active.value ? '3fr' : '1fr').join(' '))
 
-// Navigating renders the next page, which holds up the main thread. Two frames
-// first let the motion start on the compositor, where that can't stall it
+// Rendering the next page freezes the whole window for a moment, frames
+// included, so it waits until the move is over to the eye: at 85% of the
+// time this curve has under a third of a pixel left to go
+let opening: ReturnType<typeof setTimeout> | undefined
 function go(event: MouseEvent, tab: { value: string, to: string }) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return
   event.preventDefault()
   pending.value = tab.value
-  requestAnimationFrame(() => requestAnimationFrame(() => navigateTo(tab.to)))
+  clearTimeout(opening)
+  opening = setTimeout(() => navigateTo(tab.to), SECTION_TABS_MS * 0.85)
 }
+onBeforeUnmount(() => clearTimeout(opening))
 
 const nav = useTemplateRef<HTMLElement>('nav')
 const { leaving } = useSectionTabsMotion(nav, active)
@@ -96,9 +100,9 @@ const motion = { transitionDuration: `${SECTION_TABS_MS}ms`, transitionTimingFun
             v-if="!props.collapsed && (i === active || i === leaving)"
             data-label
             :data-leaving="i !== active || undefined"
-            class="ms-1.5 whitespace-nowrap pointer-events-none"
+            class="ms-1.5 overflow-hidden pointer-events-none will-change-transform"
             :class="i !== active && 'absolute left-full'"
-          >{{ tab.label }}</span>
+          ><span class="block whitespace-nowrap will-change-transform">{{ tab.label }}</span></span>
         </span>
       </NuxtLink>
     </UTooltip>
