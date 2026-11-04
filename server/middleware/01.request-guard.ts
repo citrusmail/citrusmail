@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getRequestHeader, getRequestURL } from 'nuxt/server'
 
 /** The routes anyone may call: signing in, looking up servers, the session itself */
-const PUBLIC = [/^\/api\/session$/, /^\/api\/discover$/, /^\/api\/_auth\//]
+const PUBLIC = [/^\/api\/session$/, /^\/api\/discover$/, /^\/api\/_auth\//, /^\/api\/oauth\//]
 
 const MB = 1024 * 1024
 /** A message with attachments, base64-encoded; everything else is small JSON */

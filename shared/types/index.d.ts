@@ -41,7 +41,10 @@ export interface AccountSettings {
   name?: string
   /** Login name when it differs from the email address */
   username?: string
+  /** Empty for a mailbox signed in with OAuth (see `oauth`) */
   password: string
+  /** Set when the provider only takes OAuth (Microsoft 365, Outlook.com): the tokens, kept fresh by requireAccount() */
+  oauth?: OAuthTokens
   incoming: ServerSettings & { protocol: 'imap' | 'pop3' }
   outgoing: ServerSettings
   /** CalDAV / CardDAV root, e.g. https://dav.example.com. Empty = feature off */
@@ -49,8 +52,22 @@ export interface AccountSettings {
   carddav?: string
 }
 
+export interface OAuthTokens {
+  provider: 'microsoft'
+  accessToken: string
+  refreshToken: string
+  /** When accessToken stops working, ms since epoch */
+  expiresAt: number
+  /** Stands in for the password where one is needed as a key (vault.ts) */
+  secret: string
+}
+
 /** What discovery found for an address, before a password is involved */
 export interface DiscoveryResult {
+  /** The provider takes no password: sign in goes through this OAuth provider */
+  oauth?: 'microsoft'
+  /** Whether this server is set up for that (a client id in the environment) */
+  oauthReady?: boolean
   provider?: string
   /** Iconify name for the provider logo, e.g. i-simple-icons-gmail */
   icon?: string

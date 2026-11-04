@@ -83,8 +83,12 @@ export async function runOutbox(): Promise<void> {
     for (const key of keys) {
       const item = await outbox().getItem<OutboxItem>(key)
       if (!item || item.sendAt > Date.now()) continue
-      const { account, message } = await unsealValue<{ account: AccountSettings, message: OutgoingMessage }>(item.sealed)
+      const { account: stored, message } = await unsealValue<{ account: AccountSettings, message: OutgoingMessage }>(item.sealed)
+      let account = stored
       try {
+        // An OAuth mailbox's token may have expired while the message waited
+        account = await freshAccount(stored)
+        if (account !== stored) await outbox().setItem(key, { ...item, sealed: await sealValue({ account, message }) } as never)
         const { raw } = await sendMail(account, message)
         await outbox().removeItem(key)
         await updateList(account, list => list.filter(entry => entry.id !== item.id))

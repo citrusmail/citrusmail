@@ -37,8 +37,17 @@ export function useSignIn() {
   const advancedOpen = ref(false)
   // Fields the person changed by hand are never overwritten by discovery
   const touched = ref(false)
-  const error = ref('')
+  // Sign in with Microsoft comes back here with what went wrong, if anything
+  const error = ref(typeof route.query.error === 'string' ? route.query.error : '')
   const submitting = ref(false)
+
+  /** The provider that takes no password, once discovery has said so */
+  const oauth = computed(() => discovery.value?.oauth)
+  /** Where the Sign in with Microsoft button goes: the server starts the flow */
+  const oauthUrl = computed(() => {
+    const query = new URLSearchParams({ ...(isEmail(form.email) ? { email: form.email.trim() } : {}), ...(adding.value ? { add: '1' } : {}) })
+    return `/api/oauth/${oauth.value}?${query}`
+  })
 
   const email = refDebounced(toRef(form, 'email'), 450)
 
@@ -102,5 +111,5 @@ export function useSignIn() {
     }
   }
 
-  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit }
+  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl }
 }

@@ -51,7 +51,8 @@ export async function unsealValue<T>(sealed: string): Promise<T> {
  * signed in to the same mailbox can open them and the mail server can't
  */
 function passwordKey(account: AccountSettings): Buffer {
-  return scryptSync(account.password, `citrusmail\0${account.email.toLowerCase()}`, 32)
+  // An OAuth mailbox has no password: a random secret made at sign-in stands in
+  return scryptSync(account.oauth?.secret || account.password, `citrusmail\0${account.email.toLowerCase()}`, 32)
 }
 
 export function sealForOwner(account: AccountSettings, value: unknown): string {

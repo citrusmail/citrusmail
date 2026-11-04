@@ -8,7 +8,32 @@ export async function requireAccount(event: RequestEvent): Promise<AccountSettin
   if (!account) {
     throw createError({ status: 401, message: 'Please sign in.' })
   }
-  return account
+  if (!account.oauth) return account
+  // An OAuth mailbox: a token about to expire is renewed and the cookie
+  // updated with the request's response, so every route sees a working one
+  const fresh = await freshAccount(account).catch(() => undefined)
+  if (!fresh) throw createError({ status: 401, message: 'Your Microsoft sign-in has expired. Please sign in again.', data: { auth: true } })
+  if (fresh !== account) await saveSessionAccounts(event, [fresh, ...(session.secure?.others ?? [])])
+  return fresh
+}
+
+/** Logs in to the incoming and outgoing servers and logs out: the check before a session is created */
+export async function verifyAccount(account: AccountSettings): Promise<void> {
+  const verifyIncoming = account.incoming.protocol === 'pop3' ? withPop3(account, async () => {}) : verifyImap(account)
+  const [incomingResult, outgoingResult] = await Promise.allSettled([verifyIncoming, verifySmtp(account)])
+  const failures = [
+    incomingResult.status === 'rejected' ? describeMailError(incomingResult.reason, account.incoming, false) : undefined,
+    outgoingResult.status === 'rejected' ? describeMailError(outgoingResult.reason, account.outgoing, false) : undefined
+  ]
+  if (!failures[0] && !failures[1]) return
+  // The same wrong password usually fails both sides: say it once
+  const messages = [...new Set(failures.filter(f => f).map(f => f!.message))]
+  const message = failures[0]?.auth && failures[1]?.auth ? failures[0].message : messages.join(' ')
+  throw createError({
+    status: 400,
+    message,
+    data: { incoming: failures[0]?.message, outgoing: failures[1]?.message, auth: Boolean(failures[0]?.auth || failures[1]?.auth) }
+  })
 }
 
 /**
@@ -120,6 +145,7 @@ export async function discoverAccount(email: string): Promise<DiscoveryResult> {
   const found = await discover(email)
   return {
     ...found,
+    oauthReady: found.oauth ? oauthConfigured(found.oauth) : undefined,
     incoming: config.incoming ?? found.incoming,
     outgoing: config.outgoing ?? found.outgoing,
     caldav: config.caldav ?? found.caldav,
