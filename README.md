@@ -174,6 +174,17 @@ CITRUSMAIL_BRAND_DIR=../my-brand pnpm desktop:build
 
 The result is `Acme Mail.app`, with its own icon, its own data folder and your servers set, so people only ever type their email and password. Everything in the brand folder ships inside the app and can be read by anyone who has it, so put only server names there, never a password or key. The app makes its own session secret on first launch, and `NUXT_APP_SECRET` in `app.env` is ignored.
 
+### Releases and updates
+
+Pushing a version tag builds every installer and attaches them to a draft GitHub release (`.github/workflows/release.yml`):
+
+```bash
+pnpm version patch       # bumps the version and tags it
+git push --follow-tags
+```
+
+Publish the draft and installed apps pick the new version up by themselves: the app checks the release feed on launch and every few hours, downloads only what changed, and asks to restart. On a Mac that needs a signed build, so the workflow signs and notarizes from the repository secrets `MAC_CERTIFICATE` (a Developer ID Application certificate as base64), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`. A brand sets where its own copies look for updates with `updates` in `desktop.json`, e.g. `{"provider": "generic", "url": "https://downloads.acme.com/mail"}`.
+
 ### Signing
 
 Without a certificate the Mac build is ad-hoc signed, and the first time someone opens it they right-click the app and choose Open. To sign and notarize, set `CSC_LINK` (or `CSC_NAME`) and the `APPLE_ID` variables [electron-builder reads](https://www.electron.build/code-signing) before `pnpm desktop:build`.
