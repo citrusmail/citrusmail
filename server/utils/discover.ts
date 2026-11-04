@@ -38,6 +38,8 @@ const PRESETS: Preset[] = [
   {
     provider: 'Outlook',
     icon: 'i-simple-icons-microsoftoutlook',
+    // Microsoft switched passwords off for mail apps: IMAP answers LOGINDISABLED
+    oauth: 'microsoft',
     domains: ['outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'outlook.fr', 'outlook.de', 'hotmail.co.uk', 'hotmail.fr', 'live.co.uk'],
     mx: ['mail.protection.outlook.com', 'olc.protection.outlook.com'],
     incoming: imap('outlook.office365.com'),

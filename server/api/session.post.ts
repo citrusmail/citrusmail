@@ -25,11 +25,6 @@ const bodySchema = z.object({
   add: z.boolean().optional()
 })
 
-async function verifyIncoming(account: AccountSettings) {
-  if (account.incoming.protocol === 'pop3') await withPop3(account, async () => {})
-  else await verifyImap(account)
-}
-
 export default defineEventHandler(async (event): Promise<SessionAccount> => {
   rateLimit(event, 'login', 10)
   const body = await readValidatedBody(event, bodySchema)
@@ -65,21 +60,12 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
     carddav: dav('carddav')
   }))
 
-  const [incomingResult, outgoingResult] = await Promise.allSettled([verifyIncoming(account), verifySmtp(account)])
-  const failures = [
-    incomingResult.status === 'rejected' ? describeMailError(incomingResult.reason, incoming, false) : undefined,
-    outgoingResult.status === 'rejected' ? describeMailError(outgoingResult.reason, outgoing, false) : undefined
-  ]
-  if (failures[0] || failures[1]) {
-    // The same wrong password usually fails both sides: say it once
-    const messages = [...new Set(failures.filter(f => f).map(f => f!.message))]
-    const message = failures[0]?.auth && failures[1]?.auth ? failures[0].message : messages.join(' ')
-    throw createError({
-      status: 400,
-      message,
-      data: { incoming: failures[0]?.message, outgoing: failures[1]?.message, auth: Boolean(failures[0]?.auth || failures[1]?.auth) }
-    })
+  // A provider that takes no password says so before the servers are even tried
+  if (found?.oauth && !custom) {
+    throw createError({ status: 400, message: found.oauthReady ? 'This mailbox signs in with Microsoft. Use the Sign in with Microsoft button.' : 'Microsoft no longer accepts passwords from mail apps, and this copy isn’t set up for Sign in with Microsoft yet. Whoever runs it needs to add a Microsoft app id (see the README).', data: { auth: true } })
   }
+
+  await verifyAccount(account)
 
   // Adding a mailbox keeps the others; signing in to one already here refreshes it
   const existing = body.add ? await sessionAccounts(event) : []

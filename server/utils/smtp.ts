@@ -19,7 +19,9 @@ async function transport(account: AccountSettings) {
     secure: outgoing.security === 'tls',
     requireTLS: outgoing.security === 'starttls',
     ignoreTLS: outgoing.security === 'none',
-    auth: { user: account.username || account.email, pass: account.password },
+    auth: account.oauth
+      ? { type: 'OAuth2' as const, user: account.username || account.email, accessToken: account.oauth.accessToken }
+      : { user: account.username || account.email, pass: account.password },
     tls: isLoopback(outgoing.host) ? { rejectUnauthorized: false } : undefined,
     connectionTimeout: 10_000,
     greetingTimeout: 8000,

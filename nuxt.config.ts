@@ -36,6 +36,11 @@ export default defineNuxtConfig({
     // NUXT_FAIVELO_URL=https://faivelo.com lets Faivelo mailboxes have Faivelo
     // track their opens (Settings → Tracking). Empty, the default, leaves it off
     faiveloUrl: '',
+    // Sign in with Microsoft (NUXT_OAUTH_MICROSOFT_CLIENT_ID, _CLIENT_SECRET, _TENANT):
+    // Microsoft 365 and Outlook.com mailboxes only accept OAuth, see README
+    oauth: {
+      microsoft: { clientId: '', clientSecret: '', tenant: 'common' }
+    },
     mail: {
       imap: { host: '', port: 0, security: '' },
       pop3: { host: '', port: 0, security: '' },

@@ -55,6 +55,19 @@ const isOurs = (url) => {
   }
 }
 
+// Sign in with Microsoft happens on Microsoft's own pages, in this window,
+// so the cookie that ties the attempt together and the app's header both
+// reach the callback. Anything else still opens in the browser
+const SIGN_IN_HOSTS = ['login.microsoftonline.com', 'login.live.com', 'login.microsoft.com', 'account.live.com', 'device.login.microsoftonline.com']
+const isSignIn = (url) => {
+  try {
+    const { protocol, hostname } = new URL(url)
+    return protocol === 'https:' && SIGN_IN_HOSTS.some(host => hostname === host || hostname.endsWith(`.${host}`))
+  } catch {
+    return false
+  }
+}
+
 // Before anything asks for userData: each brand keeps its own data folder
 app.setName(appName)
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -162,12 +175,12 @@ function openWindow() {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, url) => {
-    if (isOurs(url)) return
+    if (isOurs(url) || isSignIn(url)) return
     event.preventDefault()
     external(url)
   })
   win.webContents.on('will-redirect', (event, url) => {
-    if (!isOurs(url)) event.preventDefault()
+    if (!isOurs(url) && !isSignIn(url)) event.preventDefault()
   })
   // The message frame (about:srcdoc) can't be navigated anywhere either
   win.webContents.on('will-frame-navigate', (event) => {

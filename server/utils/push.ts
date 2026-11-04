@@ -80,7 +80,12 @@ function quiet(settings: NotificationSettings, timeZone: string) {
 }
 
 async function checkOne(key: string, stored: StoredPush) {
-  const accounts = await unsealValue<AccountSettings[]>(stored.accounts)
+  const storedAccounts = await unsealValue<AccountSettings[]>(stored.accounts)
+  // OAuth mailboxes: renewed tokens are kept, so the next check doesn't renew again
+  const accounts = await Promise.all(storedAccounts.map(account => freshAccount(account).catch(() => account)))
+  if (accounts.some((account, i) => account !== storedAccounts[i])) {
+    await useStorage('letterbox').setItem(key, { ...stored, accounts: await sealValue(accounts) })
+  }
   const settings = (await readStore<Partial<UserSettings>>(accounts[0]!, 'settings', {})).notifications
   if (!settings?.push) return removePush(stored.subscription.endpoint)
 

@@ -51,6 +51,23 @@ pnpm build && node .output/server/index.mjs
 
 It runs anywhere Nuxt runs, including Node, Docker, Vercel and Netlify. A long-running Node server keeps IMAP connections warm between requests, so it feels fastest there.
 
+## Sign in with Microsoft
+
+Microsoft 365 and Outlook.com mailboxes take no password from mail apps any more (their IMAP server answers `LOGINDISABLED`), so CitrusMail signs them in with Microsoft instead. That needs an app registration in [Microsoft Entra](https://entra.microsoft.com), once, about five minutes:
+
+1. **Identity → Applications → App registrations → New registration.** Any name. Supported account types: *Accounts in any organizational directory and personal Microsoft accounts*.
+2. **Authentication → Add a platform.** For a hosted copy, *Web* with the redirect URI `https://your-host/api/oauth/microsoft/callback`. For the desktop app, *Mobile and desktop applications* with `http://127.0.0.1:51730/api/oauth/microsoft/callback` (the port the app keeps). Set *Allow public client flows* to Yes.
+3. **API permissions → Add → APIs my organization uses → Office 365 Exchange Online**, delegated: `IMAP.AccessAsUser.All` and `SMTP.Send`. Add `offline_access`, `openid`, `email` and `profile` from Microsoft Graph.
+4. Copy the **Application (client) ID** and set it:
+
+```bash
+NUXT_OAUTH_MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
+NUXT_OAUTH_MICROSOFT_CLIENT_SECRET=   # optional, from Certificates & secrets, for a hosted copy
+NUXT_OAUTH_MICROSOFT_TENANT=common    # or your tenant id to allow one organization only
+```
+
+The sign-in page then shows **Sign in with Microsoft** for those addresses. The tokens live in the same encrypted cookie a password would, and are renewed on their own; after 90 days without use Microsoft asks to sign in again. Microsoft offers no CalDAV or CardDAV, so those mailboxes are mail only. In the desktop app, put the client id in the brand folder's `app.env`.
+
 ## Lock it to your company's servers (optional)
 
 Set these variables and people only enter an email and a password: the server settings, the connection card on the sign-in page and the calendar and contacts server fields are all hidden. They are read when the server starts, so no rebuild is needed.
