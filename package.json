@@ -1,6 +1,6 @@
 {
   "name": "citrusmail",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A simple, themeable mail client for any IMAP, POP3, SMTP, CalDAV and CardDAV server",
   "license": "MIT",
   "private": true,
