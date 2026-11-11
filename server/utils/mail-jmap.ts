@@ -4,7 +4,7 @@ import type { ListQuery } from './mail-imap'
 import {
   JMAP_ID, JMAP_INBOX, JMAP_MAX_BLOB, JmapError, isJmapSyncFolder, jmapEnvelope, findJmapMailbox, findJmapRole, jmapDownload, jmapFlagPatch,
   jmapFolderOf, jmapFolderPath, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
-  jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapSignIn, jmapUpload, pickJmapIdentity, readJmapPage
+  jmapAccountKey, jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapSignIn, jmapUpload, pickJmapIdentity, readJmapPage
 } from './jmap'
 import type { JmapCall, JmapContext, JmapEmail, JmapMailbox, SearchLike } from './jmap'
 
@@ -36,13 +36,56 @@ async function accountId(ctx: JmapContext) {
 }
 
 async function call(ctx: JmapContext, name: string, args: Record<string, unknown>) {
-  const responses = await jmapRequest(ctx, [[name, { accountId: await accountId(ctx), ...args }, '0']])
-  return responses.get('0') ?? {}
+  try {
+    const responses = await jmapRequest(ctx, [[name, { accountId: await accountId(ctx), ...args }, '0']])
+    return responses.get('0') ?? {}
+  } finally {
+    if (name === 'Mailbox/set') mailboxesChanged(ctx)
+  }
 }
 
-async function mailboxes(ctx: JmapContext): Promise<JmapMailbox[]> {
+/*
+ * A mail server across the internet costs a round trip per request, so what
+ * barely changes is kept for a moment: the mailbox list (ids, names, roles),
+ * which most actions only need to find a role or the Inbox, and each
+ * message's blob, which never changes for a message id
+ */
+const MAILBOX_TTL = 60_000
+const mailboxCache = new Map<string, { at: number, list: JmapMailbox[] }>()
+const BLOB_CACHE = 5000
+interface KnownBlob { blobId: string, size?: number, seen: boolean, flagged: boolean }
+const blobCache = new Map<string, KnownBlob>()
+
+/** The mailboxes, fresh when the counts matter (the folder list) or after a change */
+async function mailboxes(ctx: JmapContext, fresh = false): Promise<JmapMailbox[]> {
+  const key = jmapAccountKey(ctx.account)
+  const hit = mailboxCache.get(key)
+  if (!fresh && hit && Date.now() - hit.at < MAILBOX_TTL) return hit.list
   const result = await call(ctx, 'Mailbox/get', { properties: ['id', 'name', 'parentId', 'role', 'sortOrder', 'unreadEmails'] })
-  return (result.list as JmapMailbox[] | undefined) ?? []
+  const list = (result.list as JmapMailbox[] | undefined) ?? []
+  mailboxCache.set(key, { at: Date.now(), list })
+  if (mailboxCache.size > 500) mailboxCache.delete(mailboxCache.keys().next().value!)
+  return list
+}
+
+/** After a mailbox is made, renamed or removed */
+function mailboxesChanged(ctx: JmapContext) {
+  mailboxCache.delete(jmapAccountKey(ctx.account))
+}
+
+function blobKey(ctx: JmapContext, id: string) {
+  return `${jmapAccountKey(ctx.account)}\0${id}`
+}
+
+/** Remembers the blobs of messages just listed, so opening one skips a round trip */
+function rememberBlobs(ctx: JmapContext, emails: JmapEmail[]) {
+  for (const email of emails) {
+    if (!email.blobId) continue
+    const key = blobKey(ctx, email.id)
+    blobCache.delete(key)
+    blobCache.set(key, { blobId: email.blobId, size: email.size, seen: Boolean(email.keywords?.$seen), flagged: Boolean(email.keywords?.$flagged) })
+  }
+  while (blobCache.size > BLOB_CACHE) blobCache.delete(blobCache.keys().next().value!)
 }
 
 function mailboxIn(list: JmapMailbox[], path: string): JmapMailbox {
@@ -116,12 +159,30 @@ export async function jmapCanSubmit(account: AccountSettings): Promise<boolean> 
   return (await jmapSession(context(account))).submission
 }
 
+/** A message's source, parsed; `known` is its blob from the list, when there is one */
+async function readMessage(ctx: JmapContext, folder: string, id: string, allowRemote: RemotePolicy, markRead: boolean, known?: KnownBlob): Promise<MessageDetail> {
+  const email: JmapEmail = known
+    ? { id, blobId: known.blobId, size: known.size, keywords: { ...(known.seen ? { $seen: true } : {}), ...(known.flagged ? { $flagged: true } : {}) } }
+    : await getEmail(ctx, id, ['id', 'blobId', 'size', 'keywords'])
+  if (!known) rememberBlobs(ctx, [email])
+  const seen = Boolean(email.keywords?.$seen)
+  const [raw] = await Promise.all([
+    source(ctx, email),
+    // Sent for a listed message too: it may have been marked unread elsewhere since
+    markRead && (!seen || known) ? updateEmails(ctx, { [id]: jmapFlagPatch({ unread: false }) }).catch(() => {}) : undefined
+  ])
+  if (markRead) blobCache.set(blobKey(ctx, id), { blobId: email.blobId!, size: email.size, seen: true, flagged: Boolean(email.keywords?.$flagged) })
+  const parsed = await simpleParser(raw, { skipImageLinks: true })
+  return toMessageDetail(parsed, { id, folder, unread: markRead ? false : !seen, flagged: Boolean(email.keywords?.$flagged) }, allowRemote)
+}
+
 /** The building blocks, for the features beyond the backend (mail-jmap-extras.ts) */
 export const jmapOps = { context, accountId, call, mailboxes, roleMailbox, updateEmails, destroyEmail, importEmail, source }
 
 export const jmapBackend = {
   async listFolders(account: AccountSettings): Promise<Folder[]> {
-    return jmapFolders(await mailboxes(context(account)))
+    // The unread counts have to be current
+    return jmapFolders(await mailboxes(context(account), true))
   },
 
   async listMessages(account: AccountSettings, folder: string, query: ListQuery): Promise<MessagePage> {
@@ -132,7 +193,9 @@ export const jmapBackend = {
     const anchor = query.before && JMAP_ID.test(query.before) ? query.before : undefined
     try {
       const calls = jmapQueryCalls(await accountId(ctx), jmapListFilter(mailboxId, query), { anchor, limit: PAGE })
-      const page = readJmapPage(await jmapRequest(ctx, calls), folder)
+      const responses = await jmapRequest(ctx, calls)
+      rememberBlobs(ctx, (responses.get('g')?.list as JmapEmail[] | undefined) ?? [])
+      const page = readJmapPage(responses, folder)
       if (!query.attachments) return page
       // The server's hasAttachment filter goes by its own heuristics (some
       // match every message): the parts have the last word, as for the paperclip
@@ -145,13 +208,22 @@ export const jmapBackend = {
     }
   },
 
-  async getMessage(account: AccountSettings, folder: string, id: string, allowRemote: RemotePolicy): Promise<MessageDetail> {
+  /**
+   * One round trip for a message just listed: its blob is known, so the
+   * download and marking it read go out together. `markRead` false only reads
+   * it (to have it ready before it's opened)
+   */
+  async getMessage(account: AccountSettings, folder: string, id: string, allowRemote: RemotePolicy, markRead = true): Promise<MessageDetail> {
     const ctx = context(account)
-    const email = await getEmail(ctx, id, ['id', 'blobId', 'size', 'keywords'])
-    const raw = await source(ctx, email)
-    if (!email.keywords?.$seen) await updateEmails(ctx, { [id]: jmapFlagPatch({ unread: false }) }).catch(() => {})
-    const parsed = await simpleParser(raw, { skipImageLinks: true })
-    return toMessageDetail(parsed, { id, folder, unread: false, flagged: Boolean(email.keywords?.$flagged) }, allowRemote)
+    const known = blobCache.get(blobKey(ctx, id))
+    try {
+      return await readMessage(ctx, folder, id, allowRemote, markRead, known)
+    } catch (error) {
+      if (!known) throw error
+      // The message changed or went away since it was listed: ask the server
+      blobCache.delete(blobKey(ctx, id))
+      return readMessage(ctx, folder, id, allowRemote, markRead)
+    }
   },
 
   async getSource(account: AccountSettings, _folder: string, id: string): Promise<Buffer> {
@@ -161,7 +233,11 @@ export const jmapBackend = {
 
   async setFlags(account: AccountSettings, _folder: string, id: string, flags: { unread?: boolean, flagged?: boolean }): Promise<void> {
     const patch = jmapFlagPatch(flags)
-    if (Object.keys(patch).length) await updateEmails(context(account), { [id]: patch })
+    if (!Object.keys(patch).length) return
+    const ctx = context(account)
+    await updateEmails(ctx, { [id]: patch })
+    const known = blobCache.get(blobKey(ctx, id))
+    if (known) blobCache.set(blobKey(ctx, id), { ...known, ...(flags.unread !== undefined ? { seen: !flags.unread } : {}), ...(flags.flagged !== undefined ? { flagged: flags.flagged } : {}) })
   },
 
   async move(account: AccountSettings, folder: string, id: string, to: string): Promise<void> {
@@ -188,7 +264,7 @@ export const jmapBackend = {
 
   async createFolder(account: AccountSettings, name: string, parent?: string): Promise<string> {
     const ctx = context(account)
-    const list = await mailboxes(ctx)
+    const list = await mailboxes(ctx, true)
     const parentId = parent ? mailboxIn(list, parent).id : null
     if (sameName(list, parentId, name)) throw createError({ status: 409, message: `There's already a folder called “${name}”.` })
     const result = await call(ctx, 'Mailbox/set', { create: { new: { name, parentId } } })
@@ -197,7 +273,7 @@ export const jmapBackend = {
 
   async renameFolder(account: AccountSettings, path: string, name: string): Promise<string> {
     const ctx = context(account)
-    const list = await mailboxes(ctx)
+    const list = await mailboxes(ctx, true)
     const mailbox = mailboxIn(list, path)
     if (mailbox.role) throw createError({ status: 400, message: `${mailbox.name} can't be renamed.` })
     if (sameName(list, mailbox.parentId ?? null, name, mailbox.id)) throw createError({ status: 409, message: `There's already a folder called “${name}”.` })
@@ -212,7 +288,7 @@ export const jmapBackend = {
    */
   async deleteFolder(account: AccountSettings, path: string): Promise<number> {
     const ctx = context(account)
-    const list = await mailboxes(ctx)
+    const list = await mailboxes(ctx, true)
     const mailbox = findJmapMailbox(list, path)
     if (!mailbox) return 0
     if (mailbox.role) throw createError({ status: 400, message: `${mailbox.name} can't be deleted.` })
@@ -232,7 +308,7 @@ export const jmapBackend = {
     // Deepest first, so a parent has no folders left by the time it goes
     const id = await accountId(ctx)
     const calls: JmapCall[] = tree.map((folder, i) => ['Mailbox/set', { accountId: id, destroy: [folder.id], onDestroyRemoveEmails: false }, `d${i}`])
-    const responses = await jmapRequest(ctx, calls)
+    const responses = await jmapRequest(ctx, calls).finally(() => mailboxesChanged(ctx))
     tree.forEach((folder, i) => jmapSetResult(responses.get(`d${i}`), 'destroyed', folder.id))
     return moved
   },
@@ -312,7 +388,9 @@ export const jmapBackend = {
     const skip = list.filter(m => m.role === 'trash' || m.role === 'junk' || isJmapSyncFolder(m)).map(m => m.id)
     const conditions = [jmapSearchFilter(criteria), ...(skip.length ? [{ inMailboxOtherThan: skip }] : [])].filter(c => Object.keys(c).length)
     const filter = conditions.length > 1 ? { operator: 'AND', conditions } : conditions[0] ?? {}
-    const page = readJmapPage(await jmapRequest(ctx, jmapQueryCalls(await accountId(ctx), filter, { limit })), email => jmapFolderOf(email, list))
+    const responses = await jmapRequest(ctx, jmapQueryCalls(await accountId(ctx), filter, { limit }))
+    rememberBlobs(ctx, (responses.get('g')?.list as JmapEmail[] | undefined) ?? [])
+    const page = readJmapPage(responses, email => jmapFolderOf(email, list))
     return page.messages
   }
 }

@@ -33,7 +33,7 @@ export function mailFor(account: AccountSettings) {
   return {
     listFolders: () => backend.listFolders(account),
     listMessages: (folder: string, query: ListQuery) => backend.listMessages(account, folder, query),
-    getMessage: (folder: string, messageId: string, allowRemote: RemotePolicy = false) => backend.getMessage(account, folder, id(messageId), allowRemote),
+    getMessage: (folder: string, messageId: string, allowRemote: RemotePolicy = false, markRead = true) => backend.getMessage(account, folder, id(messageId), allowRemote, markRead),
     setFlags: (folder: string, messageId: string, flags: { unread?: boolean, flagged?: boolean }) => backend.setFlags(account, folder, id(messageId), flags),
     move: (folder: string, messageId: string, to: string) => backend.move(account, folder, id(messageId), to),
     remove: (folder: string, messageId: string) => backend.remove(account, folder, id(messageId)),

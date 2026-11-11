@@ -92,7 +92,9 @@ const agents = new Map<boolean, Agent>()
 function agentFor(allowPrivate: boolean) {
   let agent = agents.get(allowPrivate)
   if (!agent) {
-    agent = new Agent({ connect: { lookup: guardedLookup(allowPrivate) } })
+    // Connections stay open between clicks: a mail server across the internet
+    // otherwise costs a new TLS handshake whenever you pause for a few seconds
+    agent = new Agent({ connect: { lookup: guardedLookup(allowPrivate) }, keepAliveTimeout: 60_000, keepAliveMaxTimeout: 10 * 60_000 })
     agents.set(allowPrivate, agent)
   }
   return agent

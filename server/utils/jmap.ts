@@ -106,6 +106,11 @@ export function parseJmapSession(json: unknown, base: string): JmapSession {
 
 const sessions = new Map<string, { at: number, session: JmapSession }>()
 
+/** One key per server and credentials, for what's cached about an account */
+export function jmapAccountKey(account: AccountSettings) {
+  return cacheKey(account)
+}
+
 function cacheKey(account: AccountSettings) {
   return createHash('sha256').update([jmapSessionUrl(account.incoming), jmapAuthHeader(account)].join('\0')).digest('hex')
 }

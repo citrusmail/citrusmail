@@ -7,6 +7,7 @@ const compact = computed(() => view.value === 'list' && !isMobile.value)
 
 const scroller = useTemplateRef('scroller')
 const scrollEl = computed(() => scroller.value?.$el as HTMLElement | undefined)
+usePrefetchOnHover(scrollEl)
 
 useInfiniteScroll(scrollEl, () => load(false), {
   distance: 600,
