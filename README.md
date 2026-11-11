@@ -46,6 +46,12 @@ pnpm dev
 
 `pnpm test` runs the unit tests (vitest), `pnpm lint` and `pnpm typecheck` the checks CI runs.
 
+To stay signed in when the dev server restarts, give it a fixed secret once. Without one, Nuxt makes up a new secret on each start and the old sign-in no longer opens:
+
+```bash
+echo "NUXT_APP_SECRET=$(openssl rand -base64 32)" >> .env
+```
+
 In production, set a secret for sealing sessions:
 
 ```bash
