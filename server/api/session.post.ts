@@ -30,9 +30,12 @@ const bodySchema = z.object({
   add: z.boolean().optional()
 })
 
-/** The JMAP-only fields are dropped from IMAP and POP3 settings */
+/**
+ * The JMAP-only fields are dropped from IMAP and POP3 settings. A JMAP
+ * session URL decides the host: it's the server actually signed in to
+ */
 function jmapOnly(incoming: IncomingSettings): IncomingSettings {
-  if (incoming.protocol === 'jmap') return incoming
+  if (incoming.protocol === 'jmap') return jmapBoundIncoming(incoming)
   const { url: _url, auth: _auth, ...rest } = incoming
   return rest
 }
