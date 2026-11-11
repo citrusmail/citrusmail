@@ -1,4 +1,4 @@
-# CitrusMail
+# CitrusMail - by [Faivelo](https://faivelo.com)
 
 An open-source mail, calendar and contacts client for any provider, built with [Nuxt 4](https://nuxt.com) and [Nuxt UI 4](https://ui.nuxt.com).
 
