@@ -64,6 +64,29 @@ export function jmapSessionUrl(incoming: AccountSettings['incoming']): string {
   return `${scheme}://${host}${port}/.well-known/jmap`
 }
 
+/**
+ * JMAP settings whose host, port and security are the session URL's. With a
+ * URL, the host is never contacted, so a host typed alongside it would be a
+ * label anyone could choose; and the host is what an account's stored data is
+ * filed under (store.ts). An unparsable URL is left for sign-in to refuse
+ */
+export function jmapBoundIncoming(incoming: AccountSettings['incoming']): AccountSettings['incoming'] {
+  if (incoming.protocol !== 'jmap' || !incoming.url) return incoming
+  let url: URL
+  try {
+    url = new URL(incoming.url)
+  } catch {
+    return incoming
+  }
+  const secure = url.protocol === 'https:'
+  return {
+    ...incoming,
+    host: url.hostname.replace(/^\[|\]$/g, ''),
+    port: Number(url.port) || (secure ? 443 : 80),
+    security: secure ? 'tls' : 'none'
+  }
+}
+
 /** Basic with the login and (app) password, or the password as a bearer token */
 export function jmapAuthHeader(account: AccountSettings): string {
   if (account.incoming.auth === 'bearer') return `Bearer ${account.password}`
