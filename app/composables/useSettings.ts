@@ -1,6 +1,6 @@
 // Everything CitrusMail keeps for the account: signature, picture, appearance,
-// reading and notification choices. Saved on the server and synced through the
-// mailbox, so it follows you to every device
+// reading and notification choices. Saved on this device's CitrusMail server,
+// never in the mailbox
 const _useSettings = () => {
   const toast = useToast()
   const { data: settings, refresh } = useFetch<UserSettings>('/api/settings', {

@@ -1,6 +1,6 @@
 import type { SearchObject } from 'imapflow'
-import { withMailbox } from './imap'
 import { rolePathFor } from './mail-imap'
+import { moveOnce } from './move-once'
 
 export const DEFAULT_SENDERS: SenderLists = { allowed: [], blocked: [], blockAction: 'junk' }
 
@@ -32,17 +32,8 @@ async function moveMatching(account: AccountSettings, from: string, entries: str
   // Long OR chains trip some servers, so a big list goes in slices
   for (let i = 0; i < entries.length; i += 15) {
     const criteria = anyFrom(entries.slice(i, i + 15))
-    if (!criteria) continue
-    moved += await withMailbox(account, from, async (client) => {
-      const uids = await client.search(criteria, { uid: true }).catch(() => false)
-      if (!Array.isArray(uids) || !uids.length) return 0
-      // A substring match can catch more than the list means; check each sender
-      const fetched = await client.fetchAll(uids.join(','), { uid: true, envelope: true }, { uid: true })
-      const exact = fetched.filter(msg => senderMatches(entries, msg.envelope?.from?.[0]?.address)).map(msg => msg.uid)
-      if (!exact.length) return 0
-      const result = await client.messageMove(exact.join(','), to, { uid: true }).catch(() => false)
-      return result ? exact.length : 0
-    })
+    // A substring match can catch more than the list means; each sender is checked
+    if (criteria) moved += await moveOnce(account, { from, to, criteria, keep: msg => senderMatches(entries, msg.envelope?.from?.[0]?.address) })
   }
   return moved
 }
