@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   JMAP_CORE, JMAP_ID, JMAP_MAIL, JMAP_SUBMISSION, JmapError, fillJmapTemplate, jmapAuthHeader, jmapDownload,
-  jmapFlagPatch, jmapFolderOf, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
+  jmapFlagPatch, jmapFolderOf, jmapHasAttachments, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
   jmapRequest, jmapSearchFilter, jmapSession, jmapSessionUrl, jmapSetResult, jmapSummary, jmapUpload,
   jmapSignIn, parseJmapSession, pickJmapIdentity, readJmapPage, readJmapResponses
 } from '../server/utils/jmap'
@@ -240,6 +240,17 @@ describe('emails', () => {
     expect(bare).toMatchObject({ subject: '', from: { address: '' }, unread: false, flagged: false, date: new Date(0).toISOString(), messageId: undefined })
   })
 
+  it('shows the paperclip from the parts, not the server\'s hasAttachment', () => {
+    // Stalwart 0.11 says hasAttachment: true with no attachments at all
+    expect(jmapHasAttachments({ id: 'M1', hasAttachment: true, attachments: [] })).toBe(false)
+    expect(jmapHasAttachments({ id: 'M1', hasAttachment: false, attachments: [{ disposition: 'attachment', name: null }] })).toBe(true)
+    expect(jmapHasAttachments({ id: 'M1', attachments: [{ disposition: null, name: 'invoice.pdf' }] })).toBe(true)
+    // An image placed in the HTML is no attachment
+    expect(jmapHasAttachments({ id: 'M1', hasAttachment: true, attachments: [{ disposition: 'inline', name: 'logo.png' }] })).toBe(false)
+    // A server that gives no parts: its own word
+    expect(jmapHasAttachments({ id: 'M1', hasAttachment: true })).toBe(true)
+  })
+
   it('builds the list filter from the ListQuery', () => {
     expect(jmapListFilter('in', {})).toEqual({ inMailbox: 'in' })
     const now = Date.parse('2026-11-11T00:00:00Z')
@@ -284,6 +295,8 @@ describe('emails', () => {
       calculateTotal: true
     }, 'q'])
     expect(get![1]['#ids']).toEqual({ resultOf: 'q', name: 'Email/query', path: '/ids' })
+    expect(get![1].properties).toContain('attachments')
+    expect(get![1].bodyProperties).toEqual(['partId', 'disposition', 'name'])
     expect(jmapQueryCalls('A1', {}, { limit: 50 })[0]![1]).not.toHaveProperty('anchor')
   })
 

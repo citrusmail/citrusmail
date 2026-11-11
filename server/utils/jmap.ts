@@ -379,10 +379,26 @@ export interface JmapEmail {
   size?: number
   preview?: string
   hasAttachment?: boolean
+  /** Parts outside the text and HTML bodies, with only the properties asked for */
+  attachments?: { disposition?: string | null, name?: string | null }[] | null
   messageId?: string[] | null
 }
 
-export const JMAP_SUMMARY_PROPERTIES = ['id', 'blobId', 'mailboxIds', 'keywords', 'from', 'to', 'subject', 'receivedAt', 'size', 'preview', 'hasAttachment', 'messageId']
+export const JMAP_SUMMARY_PROPERTIES = ['id', 'blobId', 'mailboxIds', 'keywords', 'from', 'to', 'subject', 'receivedAt', 'size', 'preview', 'hasAttachment', 'attachments', 'messageId']
+
+/** Only what deciding on the paperclip needs from each attachment part */
+export const JMAP_ATTACHMENT_PROPERTIES = ['partId', 'disposition', 'name']
+
+/**
+ * Whether the paperclip shows. Servers set hasAttachment by their own
+ * heuristics (some set it on every message), so the parts decide, as on
+ * IMAP: one marked as an attachment, or a named one that isn't inline.
+ * hasAttachment is only the fallback for a server that gave no parts
+ */
+export function jmapHasAttachments(email: JmapEmail): boolean {
+  if (!email.attachments) return Boolean(email.hasAttachment)
+  return email.attachments.some(part => part.disposition === 'attachment' || (part.disposition !== 'inline' && Boolean(part.name)))
+}
 
 const address = (a?: JmapAddress) => ({ name: a?.name || undefined, address: a?.email ?? '' })
 
@@ -398,7 +414,7 @@ export function jmapSummary(email: JmapEmail, folder: string): MessageSummary {
     preview: (email.preview ?? '').replace(/\s+/g, ' ').trim(),
     unread: !email.keywords?.$seen,
     flagged: Boolean(email.keywords?.$flagged),
-    hasAttachments: Boolean(email.hasAttachment),
+    hasAttachments: jmapHasAttachments(email),
     // JMAP gives the id without the angle brackets IMAP's envelope has
     messageId: email.messageId?.[0] ? `<${email.messageId[0]}>` : undefined
   }
@@ -484,7 +500,8 @@ export function jmapQueryCalls(accountId: string, filter: Filter, options: { anc
     ['Email/get', {
       accountId,
       '#ids': { resultOf: 'q', name: 'Email/query', path: '/ids' },
-      'properties': JMAP_SUMMARY_PROPERTIES
+      'properties': JMAP_SUMMARY_PROPERTIES,
+      'bodyProperties': JMAP_ATTACHMENT_PROPERTIES
     }, 'g']
   ]
 }

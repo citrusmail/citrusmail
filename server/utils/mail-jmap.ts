@@ -129,7 +129,12 @@ export const jmapBackend = {
     const anchor = query.before && JMAP_ID.test(query.before) ? query.before : undefined
     try {
       const calls = jmapQueryCalls(await accountId(ctx), jmapListFilter(mailboxId, query), { anchor, limit: PAGE })
-      return readJmapPage(await jmapRequest(ctx, calls), folder)
+      const page = readJmapPage(await jmapRequest(ctx, calls), folder)
+      if (!query.attachments) return page
+      // The server's hasAttachment filter goes by its own heuristics (some
+      // match every message): the parts have the last word, as for the paperclip
+      const messages = page.messages.filter(message => message.hasAttachments)
+      return { ...page, messages, total: page.cursor ? page.total : messages.length }
     } catch (error) {
       // The message the page started after is gone: nothing more to show from there
       if (error instanceof JmapError && error.type === 'anchorNotFound') return { messages: [], total: 0 }
