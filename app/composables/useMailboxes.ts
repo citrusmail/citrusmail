@@ -9,12 +9,13 @@ const _useMailboxes = () => {
   const others = computed(() => mailboxes.value.slice(1))
   const switching = ref('')
 
-  async function switchTo(email: string) {
+  /** Opens another signed-in mailbox, at its Inbox or at `to` (a path within the app) */
+  async function switchTo(email: string, to = '/mail/INBOX') {
     if (email === account.value?.email) return
     switching.value = email
     try {
       await $fetch('/api/session/switch', { method: 'POST', body: { email } })
-      window.location.assign('/mail/INBOX')
+      window.location.assign(to.startsWith('/') && !to.startsWith('//') ? to : '/mail/INBOX')
     } catch {
       switching.value = ''
       toast.add({ title: 'Couldn’t open that mailbox', color: 'error', icon: 'i-lucide-circle-alert' })

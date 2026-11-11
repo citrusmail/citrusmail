@@ -41,9 +41,9 @@ const src = computed(() => {
   const email = props.address?.address
   if (!email?.includes('@')) return undefined
   if (settings.value.avatar && email.toLowerCase() === account.value?.email.toLowerCase()) return settings.value.avatar
-  // `v` changes when cached answers must be dropped (v2: misses cached while
+  // `v` changes when cached answers must be dropped (v3: company logos from BIMI; v2: misses cached while
   // the network guard wrongly refused every picture host)
-  return `/api/avatar?email=${encodeURIComponent(email)}&v=2`
+  return `/api/avatar?email=${encodeURIComponent(email)}&v=3`
 })
 </script>
 

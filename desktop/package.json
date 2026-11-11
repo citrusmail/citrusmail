@@ -7,5 +7,8 @@
   "license": "MIT",
   "homepage": "https://github.com/citrusmail/citrusmail",
   "type": "module",
-  "main": "main.mjs"
+  "main": "main.mjs",
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
 }
