@@ -1,3 +1,4 @@
+import pkg from './package.json'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
@@ -22,11 +23,15 @@ export default defineNuxtConfig({
     }
   },
 
-  // Every mail setting is optional. Set NUXT_MAIL_IMAP_HOST (or POP3) and
+  // Every mail setting is optional. Set NUXT_MAIL_IMAP_HOST (or POP3, or JMAP) and
   // NUXT_MAIL_SMTP_HOST to pin a company's servers: users then only type an
   // email and password, and the UI hides the Advanced panel
   runtimeConfig: {
     session: {
+      // Its own name: a browser shares cookies across ports, so another Nuxt
+      // app on localhost would otherwise overwrite it and sign you out.
+      // NUXT_SESSION_NAME renames it, e.g. for two instances on one host
+      name: 'citrusmail-session',
       // The cookie holds the mail password and can't be revoked server-side,
       // so it lasts a week rather than a month
       maxAge: 60 * 60 * 24 * 7
@@ -36,9 +41,16 @@ export default defineNuxtConfig({
     // NUXT_FAIVELO_URL=https://faivelo.com lets Faivelo mailboxes have Faivelo
     // track their opens (Settings → Tracking). Empty, the default, leaves it off
     faiveloUrl: '',
+    // Sign in with Microsoft (NUXT_OAUTH_MICROSOFT_CLIENT_ID, _CLIENT_SECRET, _TENANT):
+    // Microsoft 365 and Outlook.com mailboxes only accept OAuth, see README
+    oauth: {
+      microsoft: { clientId: '', clientSecret: '', tenant: 'common' }
+    },
     mail: {
       imap: { host: '', port: 0, security: '' },
       pop3: { host: '', port: 0, security: '' },
+      // NUXT_MAIL_JMAP_URL (a session URL), or NUXT_MAIL_JMAP_HOST / _PORT / _SECURITY
+      jmap: { host: '', port: 0, security: '', url: '' },
       smtp: { host: '', port: 0, security: '' },
       caldavUrl: '',
       carddavUrl: '',
@@ -48,13 +60,16 @@ export default defineNuxtConfig({
       allowPrivateHosts: false
     },
     public: {
+      /** Shown in Settings → About */
+      version: pkg.version,
       // NUXT_PUBLIC_CITRUSMAIL_THEME: a JSON theme override, e.g. '{"primary":"#7c3aed","radius":"0"}'.
       // Same keys as `citrusmail.theme` in app.config.ts; no rebuild needed
       citrusmail: {
         theme: {}
       },
       // Your instance's brand, at runtime: NUXT_PUBLIC_BRAND_NAME, _BYLINE, _LOGO, _LOGO_DARK,
-      // _FAVICON, _LOGIN_TITLE, _LOGIN_SUBTITLE, _LOGIN_IMAGE. Empty keeps app.config.ts
+      // _FAVICON, _LOGIN_TITLE, _LOGIN_SUBTITLE, _LOGIN_IMAGE, _CREDIT, _CREDIT_URL, _SOURCE,
+      // _LICENSE. Empty keeps app.config.ts; 'none' hides a byline, credit, source or license
       brand: {
         name: '',
         byline: '',
@@ -63,7 +78,11 @@ export default defineNuxtConfig({
         favicon: '',
         loginTitle: '',
         loginSubtitle: '',
-        loginImage: ''
+        loginImage: '',
+        credit: '',
+        creditUrl: '',
+        source: '',
+        license: ''
       },
       mail: {
         // True when the mail server is set in the environment (server/plugins/mail-lock.ts

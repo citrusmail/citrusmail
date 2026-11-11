@@ -24,7 +24,7 @@ let vapid: { publicKey: string, privateKey: string } | undefined
 
 export async function vapidKeys() {
   if (vapid) return vapid
-  const storage = useStorage('letterbox')
+  const storage = useStorage('citrusmail')
   vapid = await storage.getItem<{ publicKey: string, privateKey: string }>('push:vapid') ?? undefined
   if (!vapid) {
     vapid = webpush.generateVAPIDKeys()
@@ -34,7 +34,7 @@ export async function vapidKeys() {
 }
 
 export async function savePush(subscription: PushSubscription, accounts: AccountSettings[], timeZone: string) {
-  const storage = useStorage('letterbox')
+  const storage = useStorage('citrusmail')
   const current = await storage.getItem<StoredPush>(subKey(subscription.endpoint))
   await storage.setItem(subKey(subscription.endpoint), {
     subscription,
@@ -45,12 +45,12 @@ export async function savePush(subscription: PushSubscription, accounts: Account
 }
 
 export async function removePush(endpoint: string) {
-  await useStorage('letterbox').removeItem(subKey(endpoint))
+  await useStorage('citrusmail').removeItem(subKey(endpoint))
 }
 
 /** Signing out of a mailbox stops push for it on every browser */
 export async function forgetPushFor(email: string) {
-  const storage = useStorage('letterbox')
+  const storage = useStorage('citrusmail')
   for (const key of await storage.getKeys(PREFIX)) {
     const stored = await storage.getItem<StoredPush>(key)
     if (!stored) continue
@@ -80,7 +80,12 @@ function quiet(settings: NotificationSettings, timeZone: string) {
 }
 
 async function checkOne(key: string, stored: StoredPush) {
-  const accounts = await unsealValue<AccountSettings[]>(stored.accounts)
+  const storedAccounts = await unsealValue<AccountSettings[]>(stored.accounts)
+  // OAuth mailboxes: renewed tokens are kept, so the next check doesn't renew again
+  const accounts = await Promise.all(storedAccounts.map(account => freshAccount(account).catch(() => account)))
+  if (accounts.some((account, i) => account !== storedAccounts[i])) {
+    await useStorage('citrusmail').setItem(key, { ...stored, accounts: await sealValue(accounts) })
+  }
   const settings = (await readStore<Partial<UserSettings>>(accounts[0]!, 'settings', {})).notifications
   if (!settings?.push) return removePush(stored.subscription.endpoint)
 
@@ -90,7 +95,7 @@ async function checkOne(key: string, stored: StoredPush) {
     const email = account.email.toLowerCase()
     const folders = notifyFolders(settings, email)
     if (!folders.length) continue
-    const news = await checkNewMail(account, folders, cursors[email] ?? {}).catch(() => undefined)
+    const news = await checkNewMail(account, folders, cursors[email] ?? {}, settings.folderNames?.[email]).catch(() => undefined)
     if (!news) continue
     cursors[email] = news.cursors
     if (!news.messages.length || quiet(settings, stored.timeZone)) continue
@@ -113,7 +118,7 @@ async function checkOne(key: string, stored: StoredPush) {
       if ([404, 410].includes((error as { statusCode?: number }).statusCode ?? 0)) return removePush(stored.subscription.endpoint)
     }
   }
-  await useStorage('letterbox').setItem(key, { ...stored, cursors })
+  await useStorage('citrusmail').setItem(key, { ...stored, cursors })
 }
 
 let running = false
@@ -123,7 +128,7 @@ export async function runPush() {
   if (running) return
   running = true
   try {
-    const storage = useStorage('letterbox')
+    const storage = useStorage('citrusmail')
     for (const key of await storage.getKeys(PREFIX)) {
       const stored = await storage.getItem<StoredPush>(key)
       if (stored) await checkOne(key, stored).catch(() => {})

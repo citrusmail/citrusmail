@@ -35,6 +35,9 @@ export function describeMailError(error: unknown, server: ServerSettings, truste
   }
 
   if (err.authenticationFailed || code === 'EAUTH' || code === 'ENOAUTH' || err.responseCode === 535) {
+    if (/\.office365\.com$|\.outlook\.com$/i.test(server.host)) {
+      return { message: 'Microsoft no longer accepts passwords from mail apps. Sign in with Microsoft instead.', auth: true }
+    }
     const provider = appPasswordProvider(server.host)
     const hint = provider ? ` ${provider.name} needs an app password: create one at ${provider.url}` : ' Check the email address and password.'
     return { message: `The password was rejected by ${server.host}.${hint}`, auth: true }

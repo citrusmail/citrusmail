@@ -38,12 +38,12 @@ async function fetchTimes(client: ImapFlow, range: string, into: Map<number, num
 const storeKey = (id: string) => `order:${createHash('sha256').update(id).digest('hex').slice(0, 32)}`
 
 async function stored(id: string): Promise<FolderIndex | undefined> {
-  const saved = await useStorage('letterbox').getItem<{ uidNext: number, exists: number, pairs: [number, number][] }>(storeKey(id))
+  const saved = await useStorage('citrusmail').getItem<{ uidNext: number, exists: number, pairs: [number, number][] }>(storeKey(id))
   return saved ? { uidNext: saved.uidNext, exists: saved.exists, times: new Map(saved.pairs) } : undefined
 }
 
 function save(id: string, index: FolderIndex) {
-  useStorage('letterbox').setItem(storeKey(id), { uidNext: index.uidNext, exists: index.exists, pairs: [...index.times] }).catch(() => {})
+  useStorage('citrusmail').setItem(storeKey(id), { uidNext: index.uidNext, exists: index.exists, pairs: [...index.times] }).catch(() => {})
 }
 
 /** Received times for every message in the selected folder, by UID */

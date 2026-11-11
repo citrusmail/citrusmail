@@ -16,7 +16,7 @@ interface OutboxItem {
 }
 
 const MAX_ATTEMPTS = 5
-const outbox = () => useStorage('letterbox')
+const outbox = () => useStorage('citrusmail')
 const itemKey = (id: string) => `outbox:${id}.json`
 
 function htmlPreview(html: string) {
@@ -83,12 +83,16 @@ export async function runOutbox(): Promise<void> {
     for (const key of keys) {
       const item = await outbox().getItem<OutboxItem>(key)
       if (!item || item.sendAt > Date.now()) continue
-      const { account, message } = await unsealValue<{ account: AccountSettings, message: OutgoingMessage }>(item.sealed)
+      const { account: stored, message } = await unsealValue<{ account: AccountSettings, message: OutgoingMessage }>(item.sealed)
+      let account = stored
       try {
-        const { raw } = await sendMail(account, message)
+        // An OAuth mailbox's token may have expired while the message waited
+        account = await freshAccount(stored)
+        if (account !== stored) await outbox().setItem(key, { ...item, sealed: await sealValue({ account, message }) } as never)
+        // Files it in Sent too (or the JMAP server does)
+        await mailFor(account).send(message)
         await outbox().removeItem(key)
         await updateList(account, list => list.filter(entry => entry.id !== item.id))
-        await mailFor(account).appendSent(raw).catch(() => {})
       } catch (error) {
         const attempts = item.attempts + 1
         const reason = describeMailError(error, account.outgoing, false).message

@@ -61,8 +61,17 @@ export default defineAppConfig({
   citrusmail: {
     /** Shown in the sidebar, the sign-in page and the browser tab */
     name: 'CitrusMail',
-    /** A small line under the name; empty for none */
-    byline: '',
+    /** A small line under the name; empty for none. Only shown while the name above is kept */
+    byline: 'by Faivelo',
+    /**
+     * Who makes it and where the code is, shown on the sign-in page, at the
+     * bottom of the sidebar and in Settings → About. Empty hides each. An
+     * instance renamed with NUXT_PUBLIC_BRAND_NAME says "Built on CitrusMail"
+     */
+    credit: 'Faivelo',
+    creditUrl: 'https://faivelo.com',
+    source: 'https://github.com/citrusmail/citrusmail',
+    license: 'MIT',
     /** An image URL (e.g. '/logo.svg' in public/) to use instead of the built-in mark */
     logo: '',
     /** The logo for dark mode; empty uses `logo` */

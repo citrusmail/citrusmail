@@ -8,7 +8,8 @@ defineProps<{
 const { account } = useShell()
 const appConfig = useAppConfig()
 
-const imap = computed(() => account.value?.protocol !== 'pop3')
+// POP3 has no folders: no sender lists or rules
+const folders = computed(() => account.value?.protocol !== 'pop3')
 
 const items = computed<NavigationMenuItem[]>(() => [
   { label: 'Profile', icon: 'i-lucide-circle-user-round', to: '/settings/profile' },
@@ -17,10 +18,11 @@ const items = computed<NavigationMenuItem[]>(() => [
   { label: 'Reading', icon: 'i-lucide-book-open', to: '/settings/reading' },
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/settings/notifications' },
   // POP3 has no folders to file into
-  ...(imap.value ? [{ label: 'Senders', icon: 'i-lucide-shield-check', to: '/settings/senders' }] : []),
-  ...(imap.value ? [{ label: 'Rules', icon: 'i-lucide-list-filter', to: '/settings/rules' }] : []),
+  ...(folders.value ? [{ label: 'Senders', icon: 'i-lucide-shield-check', to: '/settings/senders' }] : []),
+  ...(folders.value ? [{ label: 'Rules', icon: 'i-lucide-list-filter', to: '/settings/rules' }] : []),
   { label: 'Tracking', icon: 'i-lucide-mail-check', to: '/settings/tracking' },
-  { label: 'AI', icon: 'i-lucide-sparkles', to: '/settings/ai' }
+  { label: 'AI', icon: 'i-lucide-sparkles', to: '/settings/ai' },
+  { label: 'About', icon: 'i-lucide-info', to: '/settings/about' }
 ])
 </script>
 

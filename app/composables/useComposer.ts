@@ -74,7 +74,8 @@ const _useComposer = () => {
   // with the new content instead of keeping what it had
   const version = ref(0)
   // The draft as it was handed to the composer, so prefilled replies don't count as changes
-  const baseline = useLocalStorage('citrusmail-draft-baseline', '')
+  // A browser that has never written anything starts from the empty draft, so it isn't "changed"
+  const baseline = useLocalStorage('citrusmail-draft-baseline', fingerprint(emptyDraft()))
   const isDirty = computed(() => fingerprint(draft.value) !== baseline.value)
 
   // The editor registers itself, so the subject's Tab can land in it

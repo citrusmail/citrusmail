@@ -37,8 +37,17 @@ export function useSignIn() {
   const advancedOpen = ref(false)
   // Fields the person changed by hand are never overwritten by discovery
   const touched = ref(false)
-  const error = ref('')
+  // Sign in with Microsoft comes back here with what went wrong, if anything
+  const error = ref(typeof route.query.error === 'string' ? route.query.error : '')
   const submitting = ref(false)
+
+  /** The provider that takes no password, once discovery has said so */
+  const oauth = computed(() => discovery.value?.oauth)
+  /** Where the Sign in with Microsoft button goes: the server starts the flow */
+  const oauthUrl = computed(() => {
+    const query = new URLSearchParams({ ...(isEmail(form.email) ? { email: form.email.trim() } : {}), ...(adding.value ? { add: '1' } : {}) })
+    return `/api/oauth/${oauth.value}?${query}`
+  })
 
   const email = refDebounced(toRef(form, 'email'), 450)
 
@@ -52,7 +61,9 @@ export function useSignIn() {
       if (value !== form.email) return
       discovery.value = result
       if (!touched.value) {
-        if (result.incoming) form.incoming = { ...result.incoming }
+        // A JMAP server goes first, as the server will try it first
+        const incoming = (result.jmap && !result.oauth ? jmapIncoming(result.jmap) : undefined) ?? result.incoming
+        if (incoming) form.incoming = { ...incoming }
         if (result.outgoing) form.outgoing = { ...result.outgoing }
         form.caldav = result.caldav ?? ''
         form.carddav = result.carddav ?? ''
@@ -64,6 +75,15 @@ export function useSignIn() {
       discovering.value = false
     }
   })
+
+  /** Discovery found both: switch between JMAP (the default) and IMAP */
+  function chooseJmap(jmap: boolean) {
+    const found = discovery.value
+    const incoming = jmap ? found?.jmap && jmapIncoming(found.jmap) : found?.incoming
+    if (!incoming) return
+    form.incoming = { ...incoming }
+    touched.value = true
+  }
 
   async function submit() {
     error.value = ''
@@ -102,5 +122,5 @@ export function useSignIn() {
     }
   }
 
-  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit }
+  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, chooseJmap }
 }

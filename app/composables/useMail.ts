@@ -47,6 +47,8 @@ const _useMail = () => {
 
   const messages = ref<MessageSummary[]>([])
   const total = ref(0)
+  // The newest few are the likeliest to be opened: fetched ahead, still unread
+  const { prefetch } = useMessageCache()
   const cursor = ref<string>()
   /** 'refreshing': a saved copy is on screen while the server is asked again */
   const status = ref<'idle' | 'loading' | 'refreshing' | 'more' | 'error'>('idle')
@@ -88,7 +90,10 @@ const _useMail = () => {
       total.value = page.total
       cursor.value = page.cursor
       status.value = 'idle'
-      if (reset) cachePage(page)
+      if (reset) {
+        cachePage(page)
+        prefetch(arrived.slice(0, 3).map(message => ({ folder: message.folder, id: message.id })))
+      }
     } catch {
       // A cached page stays up when the server can't be reached
       if (current === generation) status.value = cached ? 'idle' : 'error'
@@ -352,6 +357,13 @@ const _useMail = () => {
     if (target?.closest('input, textarea, [contenteditable="true"]')) return
     if (document.querySelector('[role="menu"], [role="listbox"], [role="dialog"]')) return
     selectedId.value = undefined
+  })
+
+  // Switching to the list alone shows the list: the message open beside it
+  // would otherwise take the whole sheet, as if the switch had opened it
+  const { view } = useMailLayout()
+  watch(view, (now, before) => {
+    if (now === 'list' && before === 'split' && selectedId.value) selectedId.value = undefined
   })
 
   return {

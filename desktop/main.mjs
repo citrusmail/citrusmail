@@ -5,7 +5,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell } from 'electron'
 import updater from 'electron-updater'
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -51,6 +51,19 @@ const desktopToken = randomBytes(32).toString('hex')
 const isOurs = (url) => {
   try {
     return new URL(url).origin === origin
+  } catch {
+    return false
+  }
+}
+
+// Sign in with Microsoft happens on Microsoft's own pages, in this window,
+// so the cookie that ties the attempt together and the app's header both
+// reach the callback. Anything else still opens in the browser
+const SIGN_IN_HOSTS = ['login.microsoftonline.com', 'login.live.com', 'login.microsoft.com', 'account.live.com', 'device.login.microsoftonline.com']
+const isSignIn = (url) => {
+  try {
+    const { protocol, hostname } = new URL(url)
+    return protocol === 'https:' && SIGN_IN_HOSTS.some(host => hostname === host || hostname.endsWith(`.${host}`))
   } catch {
     return false
   }
@@ -156,19 +169,36 @@ function openWindow() {
   })
   win.once('ready-to-show', () => win.show())
 
-  // Links in messages open in the browser, never inside the app
+  // Links in messages open in the browser, never inside the app. The one
+  // exception is the app's own server: an attachment link opens in a new tab
+  // on the web, but a browser has neither the session cookie nor the secret
+  // header, so here the app downloads it itself instead
   const external = url => /^(https?|mailto):/i.test(url) && shell.openExternal(url)
   win.webContents.setWindowOpenHandler(({ url }) => {
-    external(url)
+    if (isOurs(url)) win.webContents.downloadURL(url)
+    else external(url)
     return { action: 'deny' }
   })
+  // Downloads land in the Downloads folder (a new name if taken) and the
+  // Finder shows the file when it's done. No save dialog to click through
+  win.webContents.session.on('will-download', (_event, item) => {
+    const dir = app.getPath('downloads')
+    const name = item.getFilename() || 'attachment'
+    const [stem, ext] = name.match(/^(.*?)(\.[^.]*)?$/).slice(1)
+    let path = join(dir, name)
+    for (let n = 2; existsSync(path); n++) path = join(dir, `${stem} ${n}${ext || ''}`)
+    item.setSavePath(path)
+    item.once('done', (_e, state) => {
+      if (state === 'completed') shell.showItemInFolder(path)
+    })
+  })
   win.webContents.on('will-navigate', (event, url) => {
-    if (isOurs(url)) return
+    if (isOurs(url) || isSignIn(url)) return
     event.preventDefault()
     external(url)
   })
   win.webContents.on('will-redirect', (event, url) => {
-    if (!isOurs(url)) event.preventDefault()
+    if (!isOurs(url) && !isSignIn(url)) event.preventDefault()
   })
   // The message frame (about:srcdoc) can't be navigated anywhere either
   win.webContents.on('will-frame-navigate', (event) => {

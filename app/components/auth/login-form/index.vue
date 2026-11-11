@@ -4,7 +4,12 @@ const props = defineProps<{
   signIn: ReturnType<typeof useSignIn>
 }>()
 
-const { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit } = props.signIn
+const { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, chooseJmap } = props.signIn
+
+// A Microsoft mailbox takes no password: the button hands over to Microsoft,
+// unless the person opened the server settings to use their own servers
+const viaOauth = computed(() => !!oauth.value && !advancedOpen.value && !touched.value)
+const oauthReady = computed(() => viaOauth.value && !!discovery.value?.oauthReady)
 
 const leadingIcon = computed(() => discovering.value ? 'i-lucide-loader-circle' : discovery.value?.icon ?? 'i-lucide-at-sign')
 </script>
@@ -42,9 +47,16 @@ const leadingIcon = computed(() => discovering.value ? 'i-lucide-loader-circle' 
         />
       </UFormField>
 
-      <AuthProviderHint :discovery="discovery" />
+      <AuthProviderHint
+        :discovery="discovery"
+        :jmap="form.incoming.protocol === 'jmap'"
+        @choose-jmap="chooseJmap"
+      />
 
-      <AuthPasswordField v-model="form.password" />
+      <AuthPasswordField
+        v-if="!viaOauth"
+        v-model="form.password"
+      />
 
       <UAlert
         v-if="error"
@@ -55,6 +67,17 @@ const leadingIcon = computed(() => discovering.value ? 'i-lucide-loader-circle' 
       />
 
       <UButton
+        v-if="oauthReady"
+        :label="adding ? 'Add with Microsoft' : 'Sign in with Microsoft'"
+        icon="i-simple-icons-microsoft"
+        size="xl"
+        block
+        class="mt-1"
+        :href="oauthUrl"
+        external
+      />
+      <UButton
+        v-else-if="!viaOauth"
         type="submit"
         :label="submitting ? 'Connecting' : adding ? 'Add mailbox' : 'Sign in'"
         size="xl"

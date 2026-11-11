@@ -52,9 +52,10 @@ async function moveMatching(account: AccountSettings, from: string, entries: str
  * that landed in Junk come back. Runs with the rules each time mail is checked
  */
 export async function applySenderLists(account: AccountSettings): Promise<number> {
-  if (account.incoming.protocol !== 'imap') return 0
+  if (account.incoming.protocol === 'pop3') return 0
   const lists = await readSenders(account)
   if (!lists.allowed.length && !lists.blocked.length) return 0
+  if (account.incoming.protocol === 'jmap') return jmapApplySenderLists(account, lists)
 
   const junk = await rolePathFor(account, 'junk')
   const bin = lists.blockAction === 'trash' ? await rolePathFor(account, 'trash') : junk

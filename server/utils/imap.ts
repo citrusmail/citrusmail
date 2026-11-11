@@ -33,7 +33,9 @@ export function inBackground<T>(fn: () => Promise<T>): Promise<T> {
 
 export function accountKey(account: AccountSettings): string {
   const { email, username, password, incoming } = account
-  return createHash('sha256').update([email, username, password, incoming.host, incoming.port].join('\0')).digest('hex').slice(0, 32)
+  // A refreshed access token must land on the same pooled connection, which stays logged in
+  const credential = account.oauth ? `oauth:${account.oauth.secret}` : password
+  return createHash('sha256').update([email, username, credential, incoming.host, incoming.port].join('\0')).digest('hex').slice(0, 32)
 }
 
 /** `target` is the checked address from connectTarget(), so DNS can't change it */
@@ -45,7 +47,9 @@ export function imapOptions(account: AccountSettings, target: { address: string,
     port: incoming.port,
     secure: incoming.security === 'tls',
     doSTARTTLS: incoming.security === 'tls' ? undefined : incoming.security === 'starttls',
-    auth: { user: account.username || account.email, pass: account.password },
+    auth: account.oauth
+      ? { user: account.username || account.email, accessToken: account.oauth.accessToken }
+      : { user: account.username || account.email, pass: account.password },
     tls: isLoopback(incoming.host) ? { rejectUnauthorized: false } : undefined,
     logger: false,
     disableAutoIdle: true,

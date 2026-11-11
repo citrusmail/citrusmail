@@ -1,8 +1,8 @@
-# CitrusMail
+# CitrusMail - by [Faivelo](https://faivelo.com)
 
 An open-source mail, calendar and contacts client for any provider, built with [Nuxt 4](https://nuxt.com) and [Nuxt UI 4](https://ui.nuxt.com).
 
-- **Mail** over IMAP or POP3, sending over SMTP
+- **Mail** over IMAP, POP3 or [JMAP](#jmap), sending over SMTP (or through the JMAP server)
 - **Calendar** over CalDAV, using the [Nuxt UI calendar template](https://github.com/nuxt-ui-templates/calendar): day, week, month and year views, drag and drop, and quick events
 - **Contacts** over CardDAV
 - **Composer** built on the Nuxt UI `UEditor`, adapted from the [editor template](https://github.com/nuxt-ui-templates/editor), with send later
@@ -31,6 +31,8 @@ There is nothing to configure. Type your address, and CitrusMail finds the serve
 3. DNS SRV records (RFC 6186 for mail, RFC 6764 for CalDAV and CardDAV)
 4. Common hostnames such as `imap.example.com`, probed before they are used
 
+When the domain or its mail host also answers on `/.well-known/jmap`, CitrusMail signs in over JMAP, and falls back to IMAP if that doesn't work (see [JMAP](#jmap)).
+
 If a provider needs an app password, the sign-in page says so and links to the page where you create one. Every setting can also be entered by hand under **Server settings**.
 
 There is no database. The account settings, including the password, are stored in an encrypted, HTTP-only session cookie in your browser. Nothing is stored on the server.
@@ -42,6 +44,14 @@ pnpm install
 pnpm dev
 ```
 
+`pnpm test` runs the unit tests (vitest), `pnpm lint` and `pnpm typecheck` the checks CI runs.
+
+To stay signed in when the dev server restarts, give it a fixed secret once. Without one, Nuxt makes up a new secret on each start and the old sign-in no longer opens:
+
+```bash
+echo "NUXT_APP_SECRET=$(openssl rand -base64 32)" >> .env
+```
+
 In production, set a secret for sealing sessions:
 
 ```bash
@@ -51,6 +61,39 @@ pnpm build && node .output/server/index.mjs
 
 It runs anywhere Nuxt runs, including Node, Docker, Vercel and Netlify. A long-running Node server keeps IMAP connections warm between requests, so it feels fastest there.
 
+## Sign in with Microsoft
+
+Microsoft 365 and Outlook.com mailboxes take no password from mail apps any more (their IMAP server answers `LOGINDISABLED`), so CitrusMail signs them in with Microsoft instead. That needs an app registration in [Microsoft Entra](https://entra.microsoft.com), once, about five minutes:
+
+1. **Identity → Applications → App registrations → New registration.** Any name. Supported account types: *Accounts in any organizational directory and personal Microsoft accounts*.
+2. **Authentication → Add a platform.** For a hosted copy, *Web* with the redirect URI `https://your-host/api/oauth/microsoft/callback`. For the desktop app, *Mobile and desktop applications* with `http://127.0.0.1:51730/api/oauth/microsoft/callback` (the port the app keeps). Set *Allow public client flows* to Yes.
+3. **API permissions → Add → APIs my organization uses → Office 365 Exchange Online**, delegated: `IMAP.AccessAsUser.All` and `SMTP.Send`. Add `offline_access`, `openid`, `email` and `profile` from Microsoft Graph.
+4. Copy the **Application (client) ID** and set it:
+
+```bash
+NUXT_OAUTH_MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
+NUXT_OAUTH_MICROSOFT_CLIENT_SECRET=   # optional, from Certificates & secrets, for a hosted copy
+NUXT_OAUTH_MICROSOFT_TENANT=common    # or your tenant id to allow one organization only
+```
+
+The sign-in page then shows **Sign in with Microsoft** for those addresses. The tokens live in the same encrypted cookie a password would, and are renewed on their own; after 90 days without use Microsoft asks to sign in again. Microsoft offers no CalDAV or CardDAV, so those mailboxes are mail only. In the desktop app, put the client id in the brand folder's `app.env`.
+
+## JMAP
+
+[JMAP](https://jmap.io) (RFC 8620 and RFC 8621) is a newer mail protocol over HTTPS and JSON. When CitrusMail finds a JMAP server for your address (at `/.well-known/jmap` on the domain or its mail host, or a `_jmap._tcp` SRV record), it signs in over JMAP with just your email and password, and falls back to IMAP if JMAP doesn't take them. The sign-in page says so, with a link to use IMAP instead.
+
+- **Entering it yourself**: choose **JMAP** under **Server settings → Incoming** and type the server in one field: a name (`mail.example.com`, which means `https://mail.example.com/.well-known/jmap`), a URL with a port (`http://127.0.0.1:8080`) or the session URL itself (Fastmail: `https://api.fastmail.com/jmap/session`). A redirect is only followed on the same host, so the password never goes anywhere else.
+- **Password or token**: type your password, an app password or an API token. CitrusMail tries it as a password (Basic auth), then as a token (Bearer), and remembers which worked. Fastmail's JMAP takes an API token, made under Settings → Privacy & Security → Manage API tokens. With an app password, Fastmail signs in over IMAP instead.
+- **Sending**: when the server offers JMAP submission, mail goes out through it (EmailSubmission) and lands in Sent on its own, so SMTP settings are optional. Otherwise CitrusMail sends over the SMTP server under **Outgoing** and files a copy in Sent.
+- **What works**: folders (create, rename, delete), the message list with search and filters, reading, attachments, the original message, read and flagged, move, delete (to Trash, or for good from Trash), drafts, AI search, new-mail notifications, sender allow and block lists, rules, read receipts and delivery reports, and settings that follow you (kept in an unsubscribed **CitrusMail Settings** mailbox, as over IMAP).
+- **Subscriptions**: the subscriptions page reads the Inbox's List-Unsubscribe headers over JMAP too.
+- **Switching between IMAP and JMAP**: rules and notification folders find their folders by name on the other protocol, so they keep working when an account moves to JMAP, or when one device uses IMAP and another JMAP on the same mailbox.
+- **Not yet over JMAP**: JMAP push. Notifications use the minute-by-minute check.
+
+Tested against [Stalwart](https://stalw.art) 1.1 and 0.11. It is written to the RFCs and should work with [Fastmail](https://www.fastmail.com) and [Cyrus IMAP](https://www.cyrusimap.org) 3.x, but they haven't been tested yet: reports are welcome.
+
+To pin a JMAP server for everyone, set `NUXT_MAIL_JMAP_URL` (or `NUXT_MAIL_JMAP_HOST`), below.
+
 ## Lock it to your company's servers (optional)
 
 Set these variables and people only enter an email and a password: the server settings, the connection card on the sign-in page and the calendar and contacts server fields are all hidden. They are read when the server starts, so no rebuild is needed.
@@ -59,18 +102,20 @@ Set these variables and people only enter an email and a password: the server se
 | --- | --- |
 | `NUXT_MAIL_IMAP_HOST` / `_PORT` / `_SECURITY` | `imap.example.com` / `993` / `tls` |
 | `NUXT_MAIL_POP3_HOST` / `_PORT` / `_SECURITY` | use instead of IMAP |
+| `NUXT_MAIL_JMAP_URL`, or `NUXT_MAIL_JMAP_HOST` / `_PORT` / `_SECURITY` | `https://mail.example.com/.well-known/jmap`, use instead of IMAP. SMTP is then optional: it's only used if the server can't send |
 | `NUXT_MAIL_SMTP_HOST` / `_PORT` / `_SECURITY` | `smtp.example.com` / `465` / `tls` |
 | `NUXT_MAIL_CALDAV_URL` | `https://dav.example.com` |
 | `NUXT_MAIL_CARDDAV_URL` | `https://dav.example.com` |
 | `NUXT_MAIL_ALLOWED_DOMAINS` | `example.com,example.org` |
 
-`SECURITY` is `tls`, `starttls` or `none`. With `NUXT_MAIL_ALLOWED_DOMAINS` set, those domains' own servers are the only ones people can sign in to.
+`SECURITY` is `tls`, `starttls` or `none` (for JMAP, `tls` is https and `none` is http). With `NUXT_MAIL_ALLOWED_DOMAINS` set, those domains' own servers are the only ones people can sign in to.
 
 ### Other settings
 
 | Variable | What it does |
 | --- | --- |
 | `NUXT_APP_SECRET` | **Required.** At least 32 random characters, used to encrypt the session cookie: `openssl rand -base64 32` |
+| `NUXT_SESSION_NAME` | The session cookie's name, `citrusmail-session` by default. Give each instance its own when several run on one host, since browsers share cookies across ports |
 | `NUXT_MAIL_ALLOW_PRIVATE_HOSTS` | `true` if your mail server is on a private network. Off by default, so the server can't be pointed at internal machines |
 | `NUXT_TRUST_PROXY` | `true` behind a reverse proxy, so rate limits see each visitor's address |
 | `NUXT_FAIVELO_URL` | `https://faivelo.com` to let [Faivelo](https://faivelo.com) mailboxes have Faivelo track their opens. Off by default |
@@ -82,13 +127,16 @@ Run your own copy under your own name without forking: everything below is read 
 | Variable | What it sets |
 | --- | --- |
 | `NUXT_PUBLIC_BRAND_NAME` | The app's name: sidebar, sign-in page, browser tab |
-| `NUXT_PUBLIC_BRAND_BYLINE` | A small line under the name, e.g. `by Acme` (none by default) |
+| `NUXT_PUBLIC_BRAND_BYLINE` | A small line under the name, e.g. `by Acme`, or `none`. CitrusMail's own `by Faivelo` only shows while the name is CitrusMail |
 | `NUXT_PUBLIC_BRAND_LOGO` | A square logo image in place of the citrus mark, e.g. `/brand/logo.svg` |
 | `NUXT_PUBLIC_BRAND_LOGO_DARK` | The logo for dark mode (optional) |
 | `NUXT_PUBLIC_BRAND_FAVICON` | The browser tab icon, e.g. `/brand/favicon.svg` |
 | `NUXT_PUBLIC_BRAND_LOGIN_TITLE` | The sign-in page headline |
 | `NUXT_PUBLIC_BRAND_LOGIN_SUBTITLE` | The line under it |
 | `NUXT_PUBLIC_BRAND_LOGIN_IMAGE` | An image for the sign-in page's right half, or `none` for a single centered column |
+| `NUXT_PUBLIC_BRAND_CREDIT`, `NUXT_PUBLIC_BRAND_CREDIT_URL` | Who makes it and their site, shown on the sign-in page, at the bottom of the sidebar and in Settings → About (default: Faivelo). A renamed instance says "Built on CitrusMail, a free, open-source project by Faivelo" until you set your own, or `none` |
+| `NUXT_PUBLIC_BRAND_SOURCE` | Where your source code is, linked as "free and open source" in those same places (default: this repository), or `none` |
+| `NUXT_PUBLIC_BRAND_LICENSE` | The license named in Settings → About (default: `MIT`), or `none` |
 | `NUXT_PUBLIC_CITRUSMAIL_THEME` | Colors, fonts, corners, surfaces and shadows as JSON, e.g. `{"primary":"#7c3aed","radius":"0"}` |
 | `NUXT_BRAND_DIR` | The folder served at `/brand/` (default `./brand`) |
 
@@ -99,6 +147,8 @@ The same settings can be baked in with `citrusmail` in `app/app.config.ts`, and 
 ## What CitrusMail stores
 
 CitrusMail has no database. Your password lives only in an encrypted cookie in your browser. Signatures, rules, profile pictures and appearance choices are kept as one small JSON file per account in `.data/citrusmail`. The few secrets the server has to keep between visits (messages waiting to be sent later, AI keys and push subscriptions) are encrypted there with a key made from `NUXT_APP_SECRET` and a random key of its own, so neither the disk nor the environment alone can open them. To keep them somewhere else (Redis, S3, any [unstorage](https://unstorage.unjs.io) driver), change `nitro.storage.citrusmail` in `nuxt.config.ts`.
+
+In Docker, mount a volume at `/app/.data` (or wherever the app runs from). Without one, replacing the container loses settings that aren't synced to the mailbox, scheduled messages and the encryption key, and saved AI keys then have to be entered again.
 
 ## Keyboard
 

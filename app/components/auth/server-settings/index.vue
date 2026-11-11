@@ -17,19 +17,17 @@ const securityItems = [
   { label: 'None', value: 'none' }
 ]
 
+// A JMAP server usually sends mail itself: SMTP is only its fallback
+const jmap = computed(() => form.value.incoming.protocol === 'jmap')
+
 // One tab per thing the address connects to, so the dialog stays short
-const TABS = [
+const TABS = computed(() => [
   { label: 'Account', value: 'account', icon: 'i-lucide-circle-user-round', slot: 'account' as const },
   { label: 'Incoming', value: 'incoming', icon: 'i-lucide-inbox', slot: 'incoming' as const },
-  { label: 'Outgoing', value: 'outgoing', icon: 'i-lucide-send', slot: 'outgoing' as const },
+  { label: jmap.value ? 'Outgoing (optional)' : 'Outgoing', value: 'outgoing', icon: 'i-lucide-send', slot: 'outgoing' as const },
   { label: 'Calendar & contacts', value: 'dav', icon: 'i-lucide-calendar-days', slot: 'dav' as const }
-]
+])
 const tab = ref('incoming')
-
-const protocols = [
-  { label: 'IMAP', value: 'imap' },
-  { label: 'POP3', value: 'pop3' }
-]
 
 useServerPorts(form)
 </script>
@@ -58,26 +56,16 @@ useServerPorts(form)
         </template>
 
         <template #incoming>
-          <AuthServerFields
-            v-model:server="form.incoming"
-            title="Incoming mail"
+          <AuthIncomingFields
+            v-model:incoming="form.incoming"
             :security-items="securityItems"
-          >
-            <UTabs
-              v-model="form.incoming.protocol"
-              :items="protocols"
-              :content="false"
-              color="neutral"
-              size="xs"
-              class="w-32"
-            />
-          </AuthServerFields>
+          />
         </template>
 
         <template #outgoing>
           <AuthServerFields
             v-model:server="form.outgoing"
-            title="Outgoing mail (SMTP)"
+            :title="jmap ? 'SMTP, only if the JMAP server can’t send' : 'Outgoing mail (SMTP)'"
             :security-items="securityItems"
           />
         </template>

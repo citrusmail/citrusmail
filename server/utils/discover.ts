@@ -38,6 +38,8 @@ const PRESETS: Preset[] = [
   {
     provider: 'Outlook',
     icon: 'i-simple-icons-microsoftoutlook',
+    // Microsoft switched passwords off for mail apps: IMAP answers LOGINDISABLED
+    oauth: 'microsoft',
     domains: ['outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'outlook.fr', 'outlook.de', 'hotmail.co.uk', 'hotmail.fr', 'live.co.uk'],
     mx: ['mail.protection.outlook.com', 'olc.protection.outlook.com'],
     incoming: imap('outlook.office365.com'),
@@ -80,6 +82,9 @@ const PRESETS: Preset[] = [
     mx: ['messagingengine.com'],
     incoming: imap('imap.fastmail.com'),
     outgoing: smtp('smtp.fastmail.com'),
+    // JMAP at Fastmail takes an API token, not an app password: sign-in tries
+    // JMAP first, and falls back to IMAP when an app password is typed
+    jmap: 'https://api.fastmail.com/jmap/session',
     caldav: 'https://caldav.fastmail.com',
     carddav: 'https://carddav.fastmail.com'
   },
@@ -316,6 +321,32 @@ export async function davOnMailHosts(hosts: (string | undefined)[]): Promise<{ c
   return found
 }
 
+/**
+ * A JMAP session URL (RFC 8620 §2.2): /.well-known/jmap on the domain or
+ * its mail host, or the _jmap._tcp SRV record. It counts only when it asks
+ * for a password (401 with WWW-Authenticate) or is a JMAP session already,
+ * and, like wellKnownDav, only on https and the domain's own servers
+ */
+async function wellKnownJmap(host: string, port = 443): Promise<string | undefined> {
+  const res = await guardedFetch(false, TIMEOUT)(`https://${host}${port === 443 ? '' : `:${port}`}/.well-known/jmap`, { headers: { Accept: 'application/json' } })
+  const body = res.status === 200 ? await readLimited(res, MAX_AUTOCONFIG) : (await res.body?.cancel(), undefined)
+  const jmap = (res.status === 401 && /basic|bearer/i.test(res.headers.get('www-authenticate') ?? ''))
+    || (body?.includes('urn:ietf:params:jmap:core') ?? false)
+  if (!jmap) return undefined
+  const found = new URL(res.url)
+  return found.protocol === 'https:' && baseDomain(found.hostname) === baseDomain(host) ? found.toString() : undefined
+}
+
+export async function findJmap(domain: string, mailHost?: string): Promise<string | undefined> {
+  const hosts = [domain, ...(mailHost && /[a-z]/i.test(mailHost) && !mailHost.includes(':') && mailHost !== domain ? [mailHost] : [])]
+  // All at once, so a host that never answers costs one timeout, not one after another
+  const [fromSrv, ...found] = await Promise.all([
+    withTimeout(srv(`_jmap._tcp.${domain}`)).then(record => record ? withTimeout(wellKnownJmap(record.host, record.port)) : undefined),
+    ...hosts.map(host => withTimeout(wellKnownJmap(host)))
+  ])
+  return fromSrv ?? found.find(Boolean)
+}
+
 /* ------------------------------------------------------------------ */
 /* Guessing                                                            */
 /* ------------------------------------------------------------------ */
@@ -366,11 +397,14 @@ export async function discover(email: string): Promise<DiscoveryResult> {
   if (hit && Date.now() - hit.at < CACHE_TTL) return hit.result
 
   let found = await run(email)
-  // The presets already say where their calendars are, or that there are none
-  if (found.incoming && (!found.caldav || !found.carddav) && found.source !== 'preset' && found.source !== 'mx') {
-    const onHost = await davOnMailHosts([found.incoming.host, found.outgoing?.host])
-    found = { ...found, caldav: found.caldav ?? onHost.caldav, carddav: found.carddav ?? onHost.carddav }
-  }
+  // The presets already say where their calendars are, or that there are none,
+  // and whether they speak JMAP
+  const ours = found.source === 'preset' || found.source === 'mx'
+  const [onHost, jmap] = await Promise.all([
+    found.incoming && (!found.caldav || !found.carddav) && !ours ? davOnMailHosts([found.incoming.host, found.outgoing?.host]) : { caldav: undefined, carddav: undefined },
+    ours || found.oauth ? undefined : findJmap(email.split('@')[1] ?? '', found.incoming?.host)
+  ])
+  found = { ...found, caldav: found.caldav ?? onHost.caldav, carddav: found.carddav ?? onHost.carddav, jmap: found.jmap ?? jmap }
   const result = await publicOnly(found)
   cache.set(email, { at: Date.now(), result })
   if (cache.size > 1000) cache.delete(cache.keys().next().value!)
@@ -437,8 +471,8 @@ async function publicOnly(result: DiscoveryResult): Promise<DiscoveryResult> {
       return undefined
     }
   }
-  const [incoming, outgoing, caldav, carddav] = await Promise.all([
-    isPublic(result.incoming?.host), isPublic(result.outgoing?.host), isPublic(urlHost(result.caldav)), isPublic(urlHost(result.carddav))
+  const [incoming, outgoing, caldav, carddav, jmap] = await Promise.all([
+    isPublic(result.incoming?.host), isPublic(result.outgoing?.host), isPublic(urlHost(result.caldav)), isPublic(urlHost(result.carddav)), isPublic(urlHost(result.jmap))
   ])
   const mail = incoming && outgoing
   return {
@@ -448,6 +482,7 @@ async function publicOnly(result: DiscoveryResult): Promise<DiscoveryResult> {
     username: mail ? result.username : undefined,
     caldav: caldav ? result.caldav : undefined,
     carddav: carddav ? result.carddav : undefined,
+    jmap: jmap ? result.jmap : undefined,
     source: mail ? result.source : 'none'
   }
 }

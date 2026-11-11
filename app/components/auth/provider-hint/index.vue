@@ -1,12 +1,36 @@
 <script setup lang="ts">
 defineProps<{
   discovery: DiscoveryResult | null
+  /** Signing in over JMAP already */
+  jmap?: boolean
+}>()
+
+const emit = defineEmits<{
+  chooseJmap: [jmap: boolean]
 }>()
 </script>
 
 <template>
   <UAlert
-    v-if="discovery?.appPasswordUrl"
+    v-if="discovery?.oauth && !discovery.oauthReady"
+    icon="i-lucide-key-round"
+    color="warning"
+    variant="subtle"
+    title="Microsoft mailboxes need Sign in with Microsoft"
+    description="Microsoft no longer accepts passwords from mail apps, and this copy isn’t set up for Sign in with Microsoft yet. Whoever runs it can add it in a few minutes (see the README)."
+  />
+  <p
+    v-else-if="discovery?.oauth"
+    class="-mt-2 text-xs text-muted flex items-center gap-1.5"
+  >
+    <UIcon
+      name="i-lucide-check"
+      class="size-3.5 text-success"
+    />
+    {{ discovery.provider }} found. Microsoft signs you in on its own page, so there’s no password to type here.
+  </p>
+  <UAlert
+    v-else-if="discovery?.appPasswordUrl"
     icon="i-lucide-key-round"
     color="neutral"
     variant="subtle"
@@ -24,4 +48,10 @@ defineProps<{
     />
     {{ discovery.provider ? `${discovery.provider} found` : `Found ${discovery.incoming.host}` }}
   </p>
+  <AuthJmapOffer
+    v-if="discovery?.jmap && !discovery.oauth"
+    :active="jmap"
+    :can-switch="Boolean(discovery.incoming)"
+    @choose="emit('chooseJmap', $event)"
+  />
 </template>

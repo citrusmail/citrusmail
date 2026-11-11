@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     const email = account.email.toLowerCase()
     const folders = notifyFolders(settings.notifications, email)
     if (!folders.length) return { email, cursors: {}, messages: [] as MessageSummary[] }
-    const news = await checkNewMail(account, folders, cursors[email] ?? {}).catch(() => ({ cursors: cursors[email] ?? {}, messages: [] as MessageSummary[] }))
+    const news = await checkNewMail(account, folders, cursors[email] ?? {}, settings.notifications?.folderNames?.[email]).catch(() => ({ cursors: cursors[email] ?? {}, messages: [] as MessageSummary[] }))
     return { email, ...news }
   }))
 

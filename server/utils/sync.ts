@@ -10,7 +10,8 @@ import type { SyncMeta, SyncedName } from './store'
  * message in a folder of its own in your mailbox. Each device reads it when
  * it needs a setting (at most every two minutes) and takes anything newer;
  * each change writes a fresh copy a few seconds later. The folder is left
- * unsubscribed, so most mail programs don't show it. POP3 has no folders,
+ * unsubscribed, so most mail programs don't show it. On JMAP the same folder
+ * holds it (mail-jmap-extras.ts). POP3 has no folders,
  * so POP3 accounts keep their settings on this device only
  */
 const ATTACHMENT = 'citrusmail-settings.json'
@@ -43,11 +44,13 @@ async function fromMailbox(account: AccountSettings, name: SyncedName, value: un
 }
 
 async function readRemote(account: AccountSettings): Promise<SyncFile | undefined> {
-  const source = await withMailbox(account, SYNC_FOLDER, async (client) => {
-    if (!client.mailbox || !client.mailbox.exists) return undefined
-    const message = await client.fetchOne('*', { uid: true, source: true })
-    return message ? message.source : undefined
-  })
+  const source = account.incoming.protocol === 'jmap'
+    ? await jmapReadSettings(account)
+    : await withMailbox(account, SYNC_FOLDER, async (client) => {
+        if (!client.mailbox || !client.mailbox.exists) return undefined
+        const message = await client.fetchOne('*', { uid: true, source: true })
+        return message ? message.source : undefined
+      })
   if (!source) return undefined
   const parsed = await simpleParser(source)
   const file = parsed.attachments.find(attachment => attachment.filename === ATTACHMENT)
@@ -89,7 +92,7 @@ async function apply(account: AccountSettings, remote: SyncFile, meta: SyncMeta)
  * device that has never synced waits (briefly) for the first copy
  */
 export async function pullSettings(account: AccountSettings): Promise<void> {
-  if (account.incoming.protocol !== 'imap') return
+  if (account.incoming.protocol === 'pop3') return
   const key = accountKey(account)
   const fresh = !(await readLocal(account, 'sync-meta'))
   if (Date.now() - (lastPull.get(key) ?? 0) < PULL_EVERY) return fresh ? pulling.get(key) : undefined
@@ -117,6 +120,7 @@ async function push(account: AccountSettings) {
     attachments: [{ filename: ATTACHMENT, contentType: 'application/json', content: JSON.stringify(file) }]
   }).compile().build()
 
+  if (account.incoming.protocol === 'jmap') return jmapWriteSettings(account, raw)
   await withImap(account, async (client) => {
     const list = await client.list()
     if (!list.some(entry => entry.path === SYNC_FOLDER)) await client.mailboxCreate(SYNC_FOLDER)
@@ -134,7 +138,7 @@ async function push(account: AccountSettings) {
 
 /** Writes the settings to the mailbox a moment after the last change */
 export function pushSettings(account: AccountSettings) {
-  if (account.incoming.protocol !== 'imap') return
+  if (account.incoming.protocol === 'pop3') return
   const key = accountKey(account)
   clearTimeout(pushTimers.get(key))
   const timer = setTimeout(() => {

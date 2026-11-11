@@ -28,7 +28,7 @@ async function* keep(parts: AsyncGenerator<string>, key: string) {
     all += part
     yield part
   }
-  if (all.includes('⟦lang:')) await useStorage('letterbox').setItem(key, all)
+  if (all.includes('⟦lang:')) await useStorage('citrusmail').setItem(key, all)
 }
 
 export default defineEventHandler(async (event) => {
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const key = `translate:${createHash('sha256').update(`${to}\0${JSON.stringify(segments)}`).digest('hex').slice(0, 40)}`
 
-  const cached = await useStorage('letterbox').getItem<string>(key)
+  const cached = await useStorage('citrusmail').getItem<string>(key)
   if (cached) return new Response(cached, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Translation': 'cached' } })
 
   const prompt = segments.map((text, index) => `⟦${index}⟧${text}`).join('\n')
