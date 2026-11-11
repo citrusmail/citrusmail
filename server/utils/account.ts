@@ -17,15 +17,30 @@ export async function requireAccount(event: RequestEvent): Promise<AccountSettin
   return fresh
 }
 
-/** Logs in to the incoming and outgoing servers and logs out: the check before a session is created */
-export async function verifyAccount(account: AccountSettings): Promise<void> {
-  const verifyIncoming = account.incoming.protocol === 'pop3' ? withPop3(account, async () => {}) : verifyImap(account)
-  const [incomingResult, outgoingResult] = await Promise.allSettled([verifyIncoming, verifySmtp(account)])
+/**
+ * Logs in to the incoming and outgoing servers and logs out: the check before
+ * a session is created. Returns the account as it signed in: for JMAP, with
+ * the way the password went (as a password or as an API token)
+ */
+export async function verifyAccount(account: AccountSettings): Promise<AccountSettings> {
+  const { protocol } = account.incoming
+  const jmap = protocol === 'jmap' ? verifyJmap(account) : undefined
+  const verifyIncoming: Promise<unknown> = protocol === 'pop3'
+    ? withPop3(account, async () => {})
+    : jmap ?? verifyImap(account)
+  // A JMAP server that sends mail itself needs no SMTP server; one that can't falls back to SMTP
+  const verifyOutgoing = jmap
+    ? jmap.then(found => found.submission ? undefined : verifySmtp(account), () => undefined)
+    : verifySmtp(account)
+  const [incomingResult, outgoingResult] = await Promise.allSettled([verifyIncoming, verifyOutgoing])
   const failures = [
     incomingResult.status === 'rejected' ? describeMailError(incomingResult.reason, account.incoming, false) : undefined,
     outgoingResult.status === 'rejected' ? describeMailError(outgoingResult.reason, account.outgoing, false) : undefined
   ]
-  if (!failures[0] && !failures[1]) return
+  if (!failures[0] && !failures[1]) {
+    if (!jmap) return account
+    return { ...account, incoming: { ...account.incoming, auth: (await jmap).auth } }
+  }
   // The same wrong password usually fails both sides: say it once
   const messages = [...new Set(failures.filter(f => f).map(f => f!.message))]
   const message = failures[0]?.auth && failures[1]?.auth ? failures[0].message : messages.join(' ')
@@ -93,6 +108,23 @@ export async function saveSessionAccounts(event: RequestEvent, accounts: Account
 
 interface EnvServer { host: string, port: number | string, security: string }
 
+/** With JMAP sending through the server, SMTP is only a fallback: the same host, on submission */
+export function jmapOutgoing(incoming: IncomingSettings): ServerSettings {
+  const host = incoming.url ? new URL(incoming.url).hostname.replace(/^\[|\]$/g, '') : incoming.host
+  return { host, port: 587, security: 'starttls' }
+}
+
+/** NUXT_MAIL_JMAP_URL (a session URL), or NUXT_MAIL_JMAP_HOST with _PORT and _SECURITY */
+function envJmap(config: EnvServer & { url?: string }): IncomingSettings | undefined {
+  if (config?.url) {
+    const url = new URL(config.url)
+    const secure = url.protocol === 'https:'
+    return { protocol: 'jmap', host: url.hostname.replace(/^\[|\]$/g, ''), port: Number(url.port) || (secure ? 443 : 80), security: secure ? 'tls' : 'none', url: url.toString() }
+  }
+  const server = envServer(config, 443)
+  return server && { protocol: 'jmap', ...server, security: server.security === 'none' ? 'none' : 'tls' }
+}
+
 function envServer(server: EnvServer, fallbackPort: number): ServerSettings | undefined {
   if (!server?.host) return undefined
   const port = Number(server.port) || fallbackPort
@@ -104,6 +136,7 @@ export function mailConfig() {
   const config = useRuntimeConfig().mail as {
     imap: EnvServer
     pop3: EnvServer
+    jmap: EnvServer & { url: string }
     smtp: EnvServer
     caldavUrl: string
     carddavUrl: string
@@ -111,13 +144,15 @@ export function mailConfig() {
   }
   const imap = envServer(config.imap, 993)
   const pop3 = envServer(config.pop3, 995)
+  const jmap = envJmap(config.jmap)
   const incoming: AccountSettings['incoming'] | undefined = imap
     ? { protocol: 'imap', ...imap }
-    : pop3 ? { protocol: 'pop3', ...pop3 } : undefined
+    : jmap ?? (pop3 ? { protocol: 'pop3', ...pop3 } : undefined)
 
   return {
     incoming,
-    outgoing: envServer(config.smtp, 587),
+    // A JMAP server usually sends mail itself, so it needs no SMTP settings
+    outgoing: envServer(config.smtp, 587) ?? (incoming?.protocol === 'jmap' ? jmapOutgoing(incoming) : undefined),
     caldav: config.caldavUrl || undefined,
     carddav: config.carddavUrl || undefined,
     /** Servers are pinned: client-supplied settings are ignored */

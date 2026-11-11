@@ -301,16 +301,18 @@ export const imapBackend = {
     })
   },
 
-  async getMessage(account: AccountSettings, folder: string, id: string, allowRemote: RemotePolicy): Promise<MessageDetail> {
+  /** `markRead` false only reads it (the fetch is a PEEK), to have it ready before it's opened */
+  async getMessage(account: AccountSettings, folder: string, id: string, allowRemote: RemotePolicy, markRead = true): Promise<MessageDetail> {
     const msg = await withMailbox(account, folder, async (client) => {
       await assertOpenable(client, id)
       const found = await client.fetchOne(id, { uid: true, flags: true, source: true }, { uid: true })
-      if (found && !found.flags?.has('\\Seen')) await client.messageFlagsAdd(id, ['\\Seen'], { uid: true })
+      if (markRead && found && !found.flags?.has('\\Seen')) await client.messageFlagsAdd(id, ['\\Seen'], { uid: true })
       return found
     })
     if (!msg || !msg.source) throw createError({ status: 404, message: 'This message no longer exists.' })
     const parsed = await simpleParser(msg.source, { skipImageLinks: true })
-    return toMessageDetail(parsed, { id, folder, unread: false, flagged: Boolean(msg.flags?.has('\\Flagged')) }, allowRemote)
+    const unread = !markRead && !msg.flags?.has('\\Seen')
+    return toMessageDetail(parsed, { id, folder, unread, flagged: Boolean(msg.flags?.has('\\Flagged')) }, allowRemote)
   },
 
   async getSource(account: AccountSettings, folder: string, id: string): Promise<Buffer> {

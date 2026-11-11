@@ -95,7 +95,7 @@ async function checkOne(key: string, stored: StoredPush) {
     const email = account.email.toLowerCase()
     const folders = notifyFolders(settings, email)
     if (!folders.length) continue
-    const news = await checkNewMail(account, folders, cursors[email] ?? {}).catch(() => undefined)
+    const news = await checkNewMail(account, folders, cursors[email] ?? {}, settings.folderNames?.[email]).catch(() => undefined)
     if (!news) continue
     cursors[email] = news.cursors
     if (!news.messages.length || quiet(settings, stored.timeZone)) continue

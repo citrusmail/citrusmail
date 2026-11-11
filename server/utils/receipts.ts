@@ -50,9 +50,10 @@ export function parseReport(source: string): { id: string, kind: Kind } | undefi
 
 /** Scans Inbox mail that arrived since the last scan. Returns how many reports it used */
 export async function collectReceipts(account: AccountSettings): Promise<number> {
-  if (account.incoming.protocol !== 'imap') return 0
+  if (account.incoming.protocol === 'pop3') return 0
   const tracked = await readTracked(account)
   const state = { ...EMPTY, ...await readLocal<ReportState>(account, 'receipts') }
+  if (account.incoming.protocol === 'jmap') return collectJmap(account, tracked, state)
 
   const found = await withMailbox(account, 'INBOX', async (client) => {
     const validity = String(client.mailbox ? client.mailbox.uidValidity : '')
@@ -83,6 +84,36 @@ export async function collectReceipts(account: AccountSettings): Promise<number>
     failed: trim(state.failed)
   })
   return found.reports.length
+}
+
+/**
+ * JMAP has no UIDs that grow: the scan goes by time instead (`validity`
+ * 'jmap', `next` in ms), starting a little before the last one ended so a
+ * report that arrived while it ran isn't missed. Seeing one twice is harmless
+ */
+async function collectJmap(account: AccountSettings, tracked: Record<string, unknown>, state: ReportState): Promise<number> {
+  const started = Date.now()
+  if (!Object.keys(tracked).length) {
+    await writeLocal<ReportState>(account, 'receipts', { ...state, validity: 'jmap', next: started })
+    return 0
+  }
+  const since = state.validity === 'jmap' ? state.next : 0
+  const used: { id: string, report: { id: string, kind: Kind }, at: string }[] = []
+  for (const found of await jmapFindReports(account, since)) {
+    const report = parseReport(found.source)
+    if (report && tracked[report.id]) used.push({ id: found.id, report, at: found.at })
+  }
+  await jmapMarkRead(account, used.map(entry => entry.id)).catch(() => {})
+  for (const { report, at } of used) state[report.kind][report.id] ??= at
+  const trim = (record: Record<string, string>) => Object.fromEntries(Object.entries(record).slice(-MAX_ENTRIES))
+  await writeLocal<ReportState>(account, 'receipts', {
+    validity: 'jmap',
+    next: started - 10 * 60_000,
+    delivered: trim(state.delivered),
+    opened: trim(state.opened),
+    failed: trim(state.failed)
+  })
+  return used.length
 }
 
 /** Adds what's known to tracked messages you sent */

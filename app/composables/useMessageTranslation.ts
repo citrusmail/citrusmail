@@ -133,10 +133,23 @@ export function useMessageTranslation(message: () => MessageDetail | undefined, 
     const current = message()
     const body = present().at(-1)
     if (!current || !body) return
-    detected.value = detectLanguage(`${current.subject}\n${current.text || body.textContent || ''}`)
+    // What the sender wrote, not the message quoted under it; innerText leaves out an HTML body's styles
+    const text = current.text || (body as HTMLElement).innerText || body.textContent || ''
+    detected.value = detectLanguage(`${current.subject}\n${writtenPart(text)}`)
     const memory = recall(current)
     if (ready.value && (translatedBefore || (memory && memory.to === target.value))) nextTick(run)
   }
+
+  // Another message: nothing about the last one's language carries over while the new body draws
+  watch(() => message()?.id, (id, before) => {
+    if (id === before) return
+    controller?.abort()
+    unwrap()
+    state.value = 'idle'
+    detected.value = undefined
+    from.value = undefined
+    error.value = ''
+  })
 
   onBeforeUnmount(() => controller?.abort())
 

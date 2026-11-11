@@ -2,7 +2,7 @@ import { defineEventHandler, readValidatedBody } from 'nuxt/server'
 import { z } from 'zod'
 
 const schema = outgoingSchema.extend({
-  replace: z.object({ folder: z.string().min(1).max(1000), id: z.string().regex(/^\d{1,10}$/) }).optional()
+  replace: z.object({ folder: z.string().min(1).max(1000), id: draftId }).optional()
 })
 
 // Saves the composer's message to the Drafts folder, replacing its earlier copy

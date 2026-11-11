@@ -5,6 +5,8 @@ import type { SignInForm } from '~/composables/useSignIn'
 const DEFAULT_PORTS: Record<string, Record<string, number>> = {
   imap: { tls: 993, starttls: 143, none: 143 },
   pop3: { tls: 995, starttls: 110, none: 110 },
+  // JMAP is HTTP: SSL/TLS is https, None is plain http
+  jmap: { tls: 443, starttls: 443, none: 80 },
   smtp: { tls: 465, starttls: 587, none: 25 }
 }
 const knownPorts = new Set(Object.values(DEFAULT_PORTS).flatMap(ports => Object.values(ports)))

@@ -6,7 +6,7 @@ const bodySchema = z.object({
   /** Send later: an ISO time in the future */
   sendAt: z.iso.datetime({ offset: true }).optional(),
   /** The saved draft this message came from, removed once it's sent */
-  draft: z.object({ folder: z.string().min(1).max(1000), id: z.string().regex(/^\d{1,10}$/) }).optional()
+  draft: z.object({ folder: z.string().min(1).max(1000), id: draftId }).optional()
 })
 
 export default defineEventHandler(event =>
@@ -23,9 +23,7 @@ export default defineEventHandler(event =>
       return { ok: true as const, scheduled }
     }
 
-    const { messageId, raw } = await sendMail(account, message)
-    // The message is out: a Sent folder that can't be written to is not worth an error
-    await mail.appendSent(raw).catch(() => {})
+    const { messageId } = await mail.send(message)
     if (draft) await mail.discardDraft(draft).catch(() => {})
     return { ok: true as const, messageId }
   })

@@ -6,21 +6,40 @@ const props = defineProps<{
   back?: boolean
 }>()
 
-const { messages, setUnread } = useMail()
+const { messages, shown, setUnread } = useMail()
 const { reply, forward } = useComposer()
+const cache = useMessageCache()
 
 const showImages = ref(false)
 
-const { data: message, status, refresh } = useFetch<MessageDetail>(() => `/api/messages/${encodeURIComponent(props.id)}`, {
-  query: computed(() => ({ folder: props.folder, images: showImages.value ? 1 : undefined })),
-  server: false
-})
+// The copy on hand shows at once; otherwise the server is asked
+const message = ref<MessageDetail>()
+const status = ref<'pending' | 'success' | 'error'>('pending')
 
-// The server marks a message read as it is opened; the list follows suit
-watch(message, (value) => {
-  const summary = messages.value.find(item => item.id === props.id)
-  if (value && summary?.unread) setUnread(summary, false, true)
-}, { immediate: true })
+async function load() {
+  const { folder, id } = props
+  const images = showImages.value
+  const hit = cache.cached(folder, id, images)
+  message.value = hit?.message ?? (images ? message.value : undefined)
+  status.value = hit ? 'success' : 'pending'
+  try {
+    const entry = await cache.open(folder, id, images)
+    if (props.id !== id || props.folder !== folder || showImages.value !== images) return
+    message.value = entry.message
+    status.value = 'success'
+    // Opening marks it read: the server did, unless it was fetched ahead
+    const item = messages.value.find(row => row.id === id)
+    if (item?.unread) setUnread(item, false, entry.marked)
+  } catch {
+    if (props.id === id) status.value = 'error'
+  }
+  // The messages either side are likely next
+  const index = shown.value.findIndex(row => row.id === id && row.folder === folder)
+  if (index !== -1) cache.prefetch([shown.value[index + 1], shown.value[index - 1], shown.value[index + 2]].filter(row => row !== undefined))
+}
+
+watch(() => [props.id, props.folder, showImages.value], load, { immediate: true })
+const refresh = load
 
 const summary = computed(() => messages.value.find(item => item.id === props.id))
 const content = useTemplateRef('content')

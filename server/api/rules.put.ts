@@ -26,7 +26,8 @@ export default defineEventHandler(async (event) => {
 
   const saved = await withAccount(event, async (account) => {
     const mail = mailFor(account)
-    const existing = new Set((await mail.listFolders()).map(folder => folder.path))
+    let folders = await mail.listFolders()
+    const existing = new Set(folders.map(folder => folder.path))
     const result: MailRule[] = []
     for (const { createFolder, applyToExisting, ...rule } of rules) {
       let folder = rule.folder
@@ -38,7 +39,12 @@ export default defineEventHandler(async (event) => {
       const after = applyToExisting ? undefined : before ? before.after : await inboxMark(account)
       result.push({ ...rule, folder, after })
     }
-    return result
+    // Each rule keeps its folder's full name too, for devices on the other protocol
+    if (result.some(rule => !folders.some(folder => folder.path === rule.folder))) folders = await mail.listFolders()
+    return result.map((rule) => {
+      const folder = folders.find(entry => entry.path === rule.folder)
+      return { ...rule, folderName: folder ? folderFullName(folder) : previous.get(rule.id)?.folderName }
+    })
   })
 
   await writeStore(account, 'rules', saved)

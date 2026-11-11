@@ -89,10 +89,10 @@ export async function runOutbox(): Promise<void> {
         // An OAuth mailbox's token may have expired while the message waited
         account = await freshAccount(stored)
         if (account !== stored) await outbox().setItem(key, { ...item, sealed: await sealValue({ account, message }) } as never)
-        const { raw } = await sendMail(account, message)
+        // Files it in Sent too (or the JMAP server does)
+        await mailFor(account).send(message)
         await outbox().removeItem(key)
         await updateList(account, list => list.filter(entry => entry.id !== item.id))
-        await mailFor(account).appendSent(raw).catch(() => {})
       } catch (error) {
         const attempts = item.attempts + 1
         const reason = describeMailError(error, account.outgoing, false).message

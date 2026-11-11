@@ -35,6 +35,16 @@ export interface ServerSettings {
   security: Security
 }
 
+export type MailProtocol = 'imap' | 'pop3' | 'jmap'
+
+export interface IncomingSettings extends ServerSettings {
+  protocol: MailProtocol
+  /** JMAP: the session URL, when it isn't https://host/.well-known/jmap */
+  url?: string
+  /** JMAP: how the password goes, found at sign-in: as a password (Basic) or an API token (Bearer) */
+  auth?: 'basic' | 'bearer'
+}
+
 /** Everything needed to reach one account. Lives only in the sealed session cookie. */
 export interface AccountSettings {
   email: string
@@ -45,7 +55,8 @@ export interface AccountSettings {
   password: string
   /** Set when the provider only takes OAuth (Microsoft 365, Outlook.com): the tokens, kept fresh by requireAccount() */
   oauth?: OAuthTokens
-  incoming: ServerSettings & { protocol: 'imap' | 'pop3' }
+  incoming: IncomingSettings
+  /** With JMAP, only used when the JMAP server can't send mail itself */
   outgoing: ServerSettings
   /** CalDAV / CardDAV root, e.g. https://dav.example.com. Empty = feature off */
   caldav?: string
@@ -75,6 +86,8 @@ export interface DiscoveryResult {
   appPasswordUrl?: string
   incoming?: AccountSettings['incoming']
   outgoing?: ServerSettings
+  /** A JMAP session URL the domain or its mail host answers on: sign-in tries it before IMAP */
+  jmap?: string
   caldav?: string
   carddav?: string
   /** Where the settings came from, e.g. 'preset', 'ispdb', 'srv', 'guess' */
@@ -89,7 +102,7 @@ export interface DiscoveryResult {
 export interface SessionAccount {
   email: string
   name?: string
-  protocol: 'imap' | 'pop3'
+  protocol: MailProtocol
   hasCalendar: boolean
   hasContacts: boolean
   /** Every mailbox signed in on this browser, the open one first */
@@ -109,13 +122,15 @@ export interface MailboxSummary {
 export type FolderRole = 'inbox' | 'drafts' | 'sent' | 'junk' | 'trash' | 'archive' | 'flagged'
 
 export interface Folder {
-  /** Full IMAP path, used as the id in URLs (encodeURIComponent) */
+  /** Full IMAP path (JMAP: the mailbox id, INBOX for the Inbox), used as the id in URLs (encodeURIComponent) */
   path: string
   name: string
   role?: FolderRole
   unread: number
   /** Nesting depth for display */
   depth: number
+  /** JMAP: the names from the top down, joined by / (IMAP's path is already its full name) */
+  fullName?: string
 }
 
 export interface Address {
@@ -124,7 +139,7 @@ export interface Address {
 }
 
 export interface MessageSummary {
-  /** IMAP UID, or POP3 UIDL */
+  /** IMAP UID, POP3 UIDL, or JMAP email id */
   id: string
   folder: string
   subject: string
@@ -330,6 +345,8 @@ export interface NotificationSettings {
   push: boolean
   /** Mailbox email → folder paths to notify for; a mailbox missing here gets its Inbox */
   folders: Record<string, string[]>
+  /** Mailbox email → folder path → its full name, so a device on the other protocol finds the folder (set by the server) */
+  folderNames?: Record<string, Record<string, string>>
   /** Mailboxes that never notify */
   muted: string[]
   /** HH:mm to HH:mm, local time; empty for none */
@@ -404,9 +421,14 @@ export interface MailRule {
   conditions: RuleCondition[]
   /** Folder path the matching mail moves to */
   folder: string
+  /** The folder's full name when the rule was saved, so a device on the other protocol finds it */
+  folderName?: string
   markRead: boolean
-  /** Only Inbox mail from this UID on, so a new rule leaves older mail alone */
-  after?: { validity: string, uid: number }
+  /**
+   * Only Inbox mail from this point on, so a new rule leaves older mail alone:
+   * a UID under that UIDVALIDITY over IMAP, and `at` (ms) on any protocol
+   */
+  after?: { validity: string, uid: number, at?: number }
 }
 
 /** A rule as the client saves it: the folder can be one that doesn't exist yet */

@@ -1,4 +1,5 @@
 import { defineEventHandler, readValidatedBody } from 'nuxt/server'
+import type { RequestEvent } from 'nuxt/server'
 import { z } from 'zod'
 
 const time = z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)])
@@ -53,13 +54,36 @@ const schema = z.object({
   }).optional()
 })
 
+/**
+ * The full name of every folder chosen for notifications, for each signed-in
+ * mailbox, so a device using the other protocol (IMAP or JMAP) finds them.
+ * Names already known are kept for mailboxes that can't be listed right now
+ */
+async function notificationFolderNames(event: RequestEvent, chosen: Record<string, string[]>, known: Record<string, Record<string, string>> = {}) {
+  const names: Record<string, Record<string, string>> = {}
+  for (const account of await sessionAccounts(event)) {
+    const email = account.email.toLowerCase()
+    const paths = chosen[email]?.filter(path => path !== 'INBOX') ?? []
+    if (!paths.length || account.incoming.protocol === 'pop3') continue
+    const folders = await mailFor(account).listFolders().catch(() => undefined)
+    names[email] = Object.fromEntries(paths.flatMap((path) => {
+      const folder = folders?.find(entry => entry.path === path)
+      const name = folder ? folderFullName(folder) : known[email]?.[path]
+      return name ? [[path, name]] : []
+    }))
+  }
+  return names
+}
+
 export default defineEventHandler(async (event): Promise<UserSettings> => {
   const body = await readValidatedBody(event, schema)
   const account = await requireAccount(event)
   const current = { ...DEFAULT_SETTINGS, ...await readStore<Partial<UserSettings>>(account, 'settings', {}) }
+  const notifications = body.notifications && { ...body.notifications, folderNames: await notificationFolderNames(event, body.notifications.folders, current.notifications?.folderNames) }
   const next: UserSettings = {
     ...current,
     ...body,
+    ...(notifications ? { notifications } : {}),
     signature: body.signature !== undefined ? sanitizeSignature(body.signature) : current.signature,
     avatar: body.avatar !== undefined ? body.avatar || undefined : current.avatar,
     updatedAt: Date.now()

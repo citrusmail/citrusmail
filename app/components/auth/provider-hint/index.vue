@@ -1,6 +1,12 @@
 <script setup lang="ts">
 defineProps<{
   discovery: DiscoveryResult | null
+  /** Signing in over JMAP already */
+  jmap?: boolean
+}>()
+
+const emit = defineEmits<{
+  chooseJmap: [jmap: boolean]
 }>()
 </script>
 
@@ -42,4 +48,10 @@ defineProps<{
     />
     {{ discovery.provider ? `${discovery.provider} found` : `Found ${discovery.incoming.host}` }}
   </p>
+  <AuthJmapOffer
+    v-if="discovery?.jmap && !discovery.oauth"
+    :active="jmap"
+    :can-switch="Boolean(discovery.incoming)"
+    @choose="emit('chooseJmap', $event)"
+  />
 </template>

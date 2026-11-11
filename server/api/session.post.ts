@@ -17,13 +17,25 @@ const bodySchema = z.object({
   password: z.string().min(1, 'Password is required').max(1024).refine(noControl),
   name: z.string().trim().max(100).refine(noControl).optional(),
   username: z.string().trim().max(254).refine(noControl).optional(),
-  incoming: server.extend({ protocol: z.enum(['imap', 'pop3']) }).optional(),
+  incoming: server.extend({
+    protocol: z.enum(['imap', 'pop3', 'jmap']),
+    /** JMAP: a session URL, when it isn't at /.well-known/jmap on the host */
+    url: z.url({ protocol: /^https?$/ }).max(1000).optional(),
+    auth: z.enum(['basic', 'bearer']).optional()
+  }).optional(),
   outgoing: server.optional(),
   caldav: davUrl,
   carddav: davUrl,
   /** Add this mailbox next to the ones already signed in, instead of replacing them */
   add: z.boolean().optional()
 })
+
+/** The JMAP-only fields are dropped from IMAP and POP3 settings */
+function jmapOnly(incoming: IncomingSettings): IncomingSettings {
+  if (incoming.protocol === 'jmap') return incoming
+  const { url: _url, auth: _auth, ...rest } = incoming
+  return rest
+}
 
 export default defineEventHandler(async (event): Promise<SessionAccount> => {
   rateLimit(event, 'login', 10)
@@ -36,36 +48,53 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
   const config = mailConfig()
   // With allowed domains set, those domains' own servers are the only ones:
   // a hand-entered server would let anyone "sign in" as user@company.com
-  const custom = !config.locked && !config.allowedDomains.length && body.incoming && body.outgoing
+  // JMAP can do without SMTP settings: the server usually sends mail itself
+  const custom = !config.locked && !config.allowedDomains.length && body.incoming && (body.outgoing || body.incoming.protocol === 'jmap')
   const found = custom && body.caldav !== undefined && body.carddav !== undefined
     ? undefined
     : await discoverAccount(body.email)
 
-  const incoming = custom ? body.incoming : found?.incoming
-  const outgoing = custom ? body.outgoing : found?.outgoing
-  if (!incoming || !outgoing) {
+  // The servers to try, in order. When discovery found a JMAP server it
+  // goes first, and IMAP (or POP3) is the fallback when it won't sign in
+  const jmap = !custom && found?.jmap && !found.oauth ? jmapIncoming(found.jmap) : undefined
+  const options: { incoming: IncomingSettings, outgoing: ServerSettings }[] = custom
+    ? [{ incoming: jmapOnly(body.incoming!), outgoing: body.outgoing ?? jmapOutgoing(body.incoming!) }]
+    : [
+        ...(jmap ? [{ incoming: jmap, outgoing: found?.outgoing ?? jmapOutgoing(jmap) }] : []),
+        ...(found?.incoming && found.outgoing ? [{ incoming: found.incoming, outgoing: found.outgoing }] : [])
+      ]
+  if (!options.length) {
     const domain = body.email.split('@')[1]
     throw createError({ status: 400, message: `We couldn't find the mail servers for ${domain}. Open Advanced and enter them.`, data: { discovery: false } })
   }
 
   const dav = (key: 'caldav' | 'carddav') => config[key] ?? (custom && body[key] !== undefined ? body[key] || undefined : found?.[key])
-  const account: AccountSettings = JSON.parse(JSON.stringify({
+  const base = {
     email: body.email,
     name: body.name || undefined,
     username: body.username || found?.username,
     password: body.password,
-    incoming,
-    outgoing,
     caldav: dav('caldav'),
     carddav: dav('carddav')
-  }))
+  }
 
   // A provider that takes no password says so before the servers are even tried
   if (found?.oauth && !custom) {
     throw createError({ status: 400, message: found.oauthReady ? 'This mailbox signs in with Microsoft. Use the Sign in with Microsoft button.' : 'Microsoft no longer accepts passwords from mail apps, and this copy isn’t set up for Sign in with Microsoft yet. Whoever runs it needs to add a Microsoft app id (see the README).', data: { auth: true } })
   }
 
-  await verifyAccount(account)
+  let account: AccountSettings | undefined
+  let failure: unknown
+  for (const option of options) {
+    try {
+      account = await verifyAccount(JSON.parse(JSON.stringify({ ...base, ...option })))
+      break
+    } catch (error) {
+      failure = error
+    }
+  }
+  // Every option failed: the last one's error (IMAP's, when JMAP went first) says why
+  if (!account) throw failure
 
   // Adding a mailbox keeps the others; signing in to one already here refreshes it
   const existing = body.add ? await sessionAccounts(event) : []

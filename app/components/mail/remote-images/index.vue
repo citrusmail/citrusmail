@@ -37,7 +37,7 @@ async function always() {
       class="p-0 text-xs text-toned"
       @click="emit('show')"
     />
-    <template v-if="account?.protocol === 'imap' && message.from.address">
+    <template v-if="account?.protocol !== 'pop3' && message.from.address">
       <UButton
         :label="`Always show from ${personName(message.from)}`"
         color="neutral"
