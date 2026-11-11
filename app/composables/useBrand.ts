@@ -1,8 +1,10 @@
 type BrandKey = 'name' | 'byline' | 'logo' | 'logoDark' | 'favicon' | 'loginTitle' | 'loginSubtitle' | 'loginImage'
+  | 'credit' | 'creditUrl' | 'source' | 'license'
 
 /**
  * The instance's brand: `citrusmail` in app.config.ts, overridden at runtime by
- * NUXT_PUBLIC_BRAND_* (no rebuild)
+ * NUXT_PUBLIC_BRAND_* (no rebuild). For the byline, credit, source and
+ * license, 'none' hides what app.config.ts would show
  */
 export function useBrand() {
   const appConfig = useAppConfig()
@@ -12,9 +14,16 @@ export function useBrand() {
 
   return computed(() => {
     const base = appConfig.citrusmail
-    const pick = (key: BrandKey) => env?.[key]?.trim() || base[key] || ''
+    const pick = (key: BrandKey) => {
+      const value = env?.[key]?.trim()
+      if (value?.toLowerCase() === 'none') return ''
+      return value || base[key] || ''
+    }
     const name = pick('name')
-    const byline = pick('byline')
+    // Renamed at runtime: the credit then says what it's built on, not that it's ours
+    const renamed = name !== base.name
+    // The built-in byline belongs to the built-in name: a renamed instance only shows its own
+    const byline = env?.byline?.trim() ? pick('byline') : renamed ? '' : base.byline
     return {
       name,
       // Left out where the name already says it ("Acme Mail" by Acme)
@@ -26,7 +35,13 @@ export function useBrand() {
       loginSubtitle: pick('loginSubtitle') || (locked
         ? `Use your ${name} email address and password.`
         : `Gmail, iCloud, Fastmail, your company’s server or any other IMAP account. ${name} looks up the settings for you.`),
-      loginImage: pick('loginImage')
+      loginImage: pick('loginImage'),
+      /** Who makes it, and what a renamed instance is built on (empty when not) */
+      credit: pick('credit'),
+      creditUrl: pick('creditUrl'),
+      builtOn: renamed && !env?.credit?.trim() ? base.name : '',
+      source: pick('source'),
+      license: pick('license')
     }
   })
 }

@@ -1,3 +1,4 @@
+import pkg from './package.json'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
@@ -53,13 +54,16 @@ export default defineNuxtConfig({
       allowPrivateHosts: false
     },
     public: {
+      /** Shown in Settings → About */
+      version: pkg.version,
       // NUXT_PUBLIC_CITRUSMAIL_THEME: a JSON theme override, e.g. '{"primary":"#7c3aed","radius":"0"}'.
       // Same keys as `citrusmail.theme` in app.config.ts; no rebuild needed
       citrusmail: {
         theme: {}
       },
       // Your instance's brand, at runtime: NUXT_PUBLIC_BRAND_NAME, _BYLINE, _LOGO, _LOGO_DARK,
-      // _FAVICON, _LOGIN_TITLE, _LOGIN_SUBTITLE, _LOGIN_IMAGE. Empty keeps app.config.ts
+      // _FAVICON, _LOGIN_TITLE, _LOGIN_SUBTITLE, _LOGIN_IMAGE, _CREDIT, _CREDIT_URL, _SOURCE,
+      // _LICENSE. Empty keeps app.config.ts; 'none' hides a byline, credit, source or license
       brand: {
         name: '',
         byline: '',
@@ -68,7 +72,11 @@ export default defineNuxtConfig({
         favicon: '',
         loginTitle: '',
         loginSubtitle: '',
-        loginImage: ''
+        loginImage: '',
+        credit: '',
+        creditUrl: '',
+        source: '',
+        license: ''
       },
       mail: {
         // True when the mail server is set in the environment (server/plugins/mail-lock.ts

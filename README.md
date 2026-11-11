@@ -99,13 +99,16 @@ Run your own copy under your own name without forking: everything below is read 
 | Variable | What it sets |
 | --- | --- |
 | `NUXT_PUBLIC_BRAND_NAME` | The app's name: sidebar, sign-in page, browser tab |
-| `NUXT_PUBLIC_BRAND_BYLINE` | A small line under the name, e.g. `by Acme` (none by default) |
+| `NUXT_PUBLIC_BRAND_BYLINE` | A small line under the name, e.g. `by Acme`, or `none`. CitrusMail's own `by Faivelo` only shows while the name is CitrusMail |
 | `NUXT_PUBLIC_BRAND_LOGO` | A square logo image in place of the citrus mark, e.g. `/brand/logo.svg` |
 | `NUXT_PUBLIC_BRAND_LOGO_DARK` | The logo for dark mode (optional) |
 | `NUXT_PUBLIC_BRAND_FAVICON` | The browser tab icon, e.g. `/brand/favicon.svg` |
 | `NUXT_PUBLIC_BRAND_LOGIN_TITLE` | The sign-in page headline |
 | `NUXT_PUBLIC_BRAND_LOGIN_SUBTITLE` | The line under it |
 | `NUXT_PUBLIC_BRAND_LOGIN_IMAGE` | An image for the sign-in page's right half, or `none` for a single centered column |
+| `NUXT_PUBLIC_BRAND_CREDIT`, `NUXT_PUBLIC_BRAND_CREDIT_URL` | Who makes it and their site, shown on the sign-in page, at the bottom of the sidebar and in Settings → About (default: Faivelo). A renamed instance says "Built on CitrusMail, a free, open-source project by Faivelo" until you set your own, or `none` |
+| `NUXT_PUBLIC_BRAND_SOURCE` | Where your source code is, linked as "free and open source" in those same places (default: this repository), or `none` |
+| `NUXT_PUBLIC_BRAND_LICENSE` | The license named in Settings → About (default: `MIT`), or `none` |
 | `NUXT_PUBLIC_CITRUSMAIL_THEME` | Colors, fonts, corners, surfaces and shadows as JSON, e.g. `{"primary":"#7c3aed","radius":"0"}` |
 | `NUXT_BRAND_DIR` | The folder served at `/brand/` (default `./brand`) |
 

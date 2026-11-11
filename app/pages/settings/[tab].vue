@@ -10,7 +10,8 @@ const TABS = {
   senders: { title: 'Senders', description: 'People and domains that always reach your Inbox, and those that never do.' },
   rules: { title: 'Rules', description: 'Sort incoming mail into folders on its own.' },
   tracking: { title: 'Tracking', description: 'Find out when messages you send are delivered and opened.' },
-  ai: { title: 'AI', description: 'Bring your own key to draft replies, summarize long messages and ask questions of all your mail.' }
+  ai: { title: 'AI', description: 'Bring your own key to draft replies, summarize long messages and ask questions of all your mail.' },
+  about: { title: 'About', description: 'The app, its version and where its code is.' }
 } as const
 
 const tab = computed(() => (route.params.tab as string) in TABS ? route.params.tab as keyof typeof TABS : 'profile')
@@ -30,6 +31,7 @@ useSeoMeta({ title: () => `${TABS[tab.value].title} · Settings` })
     <SettingsSenders v-else-if="tab === 'senders'" />
     <SettingsAi v-else-if="tab === 'ai'" />
     <SettingsTracking v-else-if="tab === 'tracking'" />
+    <SettingsAbout v-else-if="tab === 'about'" />
     <SettingsRules v-else />
   </SettingsPage>
 </template>
