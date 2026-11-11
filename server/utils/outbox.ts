@@ -16,7 +16,7 @@ interface OutboxItem {
 }
 
 const MAX_ATTEMPTS = 5
-const outbox = () => useStorage('letterbox')
+const outbox = () => useStorage('citrusmail')
 const itemKey = (id: string) => `outbox:${id}.json`
 
 function htmlPreview(html: string) {

@@ -117,6 +117,8 @@ The same settings can be baked in with `citrusmail` in `app/app.config.ts`, and 
 
 CitrusMail has no database. Your password lives only in an encrypted cookie in your browser. Signatures, rules, profile pictures and appearance choices are kept as one small JSON file per account in `.data/citrusmail`. The few secrets the server has to keep between visits (messages waiting to be sent later, AI keys and push subscriptions) are encrypted there with a key made from `NUXT_APP_SECRET` and a random key of its own, so neither the disk nor the environment alone can open them. To keep them somewhere else (Redis, S3, any [unstorage](https://unstorage.unjs.io) driver), change `nitro.storage.citrusmail` in `nuxt.config.ts`.
 
+In Docker, mount a volume at `/app/.data` (or wherever the app runs from). Without one, replacing the container loses settings that aren't synced to the mailbox, scheduled messages and the encryption key, and saved AI keys then have to be entered again.
+
 ## Keyboard
 
 Press `?` anywhere in the app to see every shortcut. The main ones:

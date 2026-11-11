@@ -47,7 +47,7 @@ export async function pixelFor(account: AccountSettings, messageId: string, mess
     src = await faiveloPixel(account, messageId, message)
   } else {
     const token = randomBytes(18).toString('base64url')
-    await useStorage('letterbox').setItem(`pixel:${token}`, { store: storeId(account), messageId: normalizeId(messageId), sentAt: Date.now() } satisfies Pixel)
+    await useStorage('citrusmail').setItem(`pixel:${token}`, { store: storeId(account), messageId: normalizeId(messageId), sentAt: Date.now() } satisfies Pixel)
     src = `${settings!.origin!.replace(/\/+$/, '')}/r/${token}.gif`
   }
   return `<img src="${src}" width="1" height="1" alt="" style="border:0;width:1px;height:1px">`
@@ -66,7 +66,7 @@ function isMaybe(pixel: Pixel, ip: string, agent: string) {
 }
 
 export async function recordOpen(token: string, ip: string, agent: string) {
-  const storage = useStorage('letterbox')
+  const storage = useStorage('citrusmail')
   const pixel = await storage.getItem<Pixel>(`pixel:${token}`)
   if (!pixel) return
   const key = `${pixel.store}:opens.json`

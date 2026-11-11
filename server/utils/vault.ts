@@ -12,7 +12,7 @@ let cached: Buffer | undefined
 
 async function vaultKey(): Promise<Buffer> {
   if (cached) return cached
-  const storage = useStorage('letterbox')
+  const storage = useStorage('citrusmail')
   let local = await storage.getItem<string>('vault:key')
   if (!local) {
     local = randomBytes(32).toString('hex')
