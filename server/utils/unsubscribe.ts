@@ -100,36 +100,44 @@ export function listSubscriptions(account: AccountSettings, scan = 800): Promise
 }
 
 async function scanSubscriptions(account: AccountSettings, scan: number): Promise<Subscription[]> {
-  // Reads IMAP headers in bulk; the page is only offered for IMAP mailboxes
-  if (account.incoming.protocol !== 'imap') return []
+  // POP3 has only the messages it downloads; IMAP and JMAP read headers in bulk
+  const { protocol } = account.incoming
+  if (protocol === 'pop3') return []
   const unsubscribed = await readLocal<Record<string, string>>(account, 'unsubscribed') ?? {}
-  const found = await withMailbox(account, 'INBOX', async (client) => {
-    const exists = client.mailbox ? client.mailbox.exists : 0
-    if (!exists) return []
-    const range = `${Math.max(1, exists - scan + 1)}:*`
-    return client.fetchAll(range, { uid: true, envelope: true, headers: ['list-unsubscribe', 'list-unsubscribe-post'] })
-  })
+  const found = protocol === 'jmap'
+    ? await jmapListHeaders(account, scan)
+    : (await withMailbox(account, 'INBOX', async (client) => {
+        const exists = client.mailbox ? client.mailbox.exists : 0
+        if (!exists) return []
+        const range = `${Math.max(1, exists - scan + 1)}:*`
+        return client.fetchAll(range, { uid: true, envelope: true, headers: ['list-unsubscribe', 'list-unsubscribe-post'] })
+      })).map(message => ({
+        id: String(message.uid),
+        name: message.envelope?.from?.[0]?.name,
+        address: message.envelope?.from?.[0]?.address,
+        date: new Date(message.envelope?.date ?? 0).toISOString(),
+        headers: message.headers?.toString('utf8') ?? ''
+      }))
 
   const bySender = new Map<string, Subscription>()
   for (const message of found) {
-    const targets = message.headers ? unsubscribeFromHeaders(message.headers.toString('utf8')) : undefined
-    const sender = message.envelope?.from?.[0]
-    if (!targets || !sender?.address) continue
-    const address = sender.address.toLowerCase()
-    const date = new Date(message.envelope?.date ?? 0).toISOString()
+    const targets = message.headers ? unsubscribeFromHeaders(message.headers) : undefined
+    if (!targets || !message.address) continue
+    const address = message.address.toLowerCase()
+    const date = message.date
     const known = bySender.get(address)
     if (known) {
       known.count++
-      if (date > known.lastDate) Object.assign(known, { lastDate: date, id: String(message.uid), method: unsubscribeMethod(targets), name: sender.name || known.name })
+      if (date > known.lastDate) Object.assign(known, { lastDate: date, id: message.id, method: unsubscribeMethod(targets), name: message.name || known.name })
       continue
     }
     bySender.set(address, {
       address,
-      name: sender.name || undefined,
+      name: message.name || undefined,
       count: 1,
       lastDate: date,
       folder: 'INBOX',
-      id: String(message.uid),
+      id: message.id,
       method: unsubscribeMethod(targets),
       unsubscribedAt: unsubscribed[address]
     })

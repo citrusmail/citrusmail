@@ -81,7 +81,8 @@ export async function jmapInboxState(account: AccountSettings): Promise<string> 
 
 /** Where a new rule starts: mail received from now on */
 export function jmapRuleMark(): MailRule['after'] {
-  return { validity: JMAP_RULE_MARK, uid: Date.now() }
+  const now = Date.now()
+  return { validity: JMAP_RULE_MARK, uid: now, at: now }
 }
 
 /**
@@ -179,4 +180,39 @@ export async function jmapWriteSettings(account: AccountSettings, raw: Buffer): 
   const id = await ops().importEmail(ctx, raw, folder.id, { $seen: true })
   const older = (await find(ctx, { inMailbox: folder.id }, ['id'], 50)).filter(email => email.id !== id)
   if (older.length) await ops().call(ctx, 'Email/set', { destroy: older.map(email => email.id) })
+}
+
+/* ------------------------------------------------------------------ */
+/* Subscriptions (unsubscribe.ts)                                      */
+/* ------------------------------------------------------------------ */
+
+const LIST_HEADERS = ['header:List-Unsubscribe', 'header:List-Unsubscribe-Post'] as const
+
+/**
+ * The newest `scan` Inbox messages that carry List-Unsubscribe, with those
+ * headers as text. Fetched in batches, under servers' usual Email/get limit
+ */
+export async function jmapListHeaders(account: AccountSettings, scan: number): Promise<{ id: string, name?: string, address?: string, date: string, headers: string }[]> {
+  const ctx = ops().context(account)
+  const inbox = findJmapRole(await ops().mailboxes(ctx), 'inbox')
+  if (!inbox) return []
+  const query = await ops().call(ctx, 'Email/query', { filter: { inMailbox: inbox.id }, sort: [{ property: 'receivedAt', isAscending: false }], limit: scan })
+  const ids = (query.ids as string[] | undefined) ?? []
+  const found = []
+  for (let i = 0; i < ids.length; i += 250) {
+    const result = await ops().call(ctx, 'Email/get', { ids: ids.slice(i, i + 250), properties: ['id', 'from', 'receivedAt', ...LIST_HEADERS] })
+    for (const email of (result.list as (JmapEmail & Record<string, unknown>)[] | undefined) ?? []) {
+      const [list, post] = LIST_HEADERS.map(name => email[name])
+      if (typeof list !== 'string') continue
+      const sender = email.from?.[0]
+      found.push({
+        id: email.id,
+        name: sender?.name ?? undefined,
+        address: sender?.email ?? undefined,
+        date: email.receivedAt ?? new Date(0).toISOString(),
+        headers: `List-Unsubscribe:${list}\r\n${typeof post === 'string' ? `List-Unsubscribe-Post:${post}\r\n` : ''}`
+      })
+    }
+  }
+  return found
 }

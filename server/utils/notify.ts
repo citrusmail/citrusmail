@@ -32,12 +32,24 @@ async function folderNews(client: ImapFlow, account: AccountSettings, path: stri
   return { next, messages }
 }
 
-export function checkNewMail(account: AccountSettings, folders: string[], cursors: Cursors): Promise<NewMail> {
-  return inBackground(() => checkNow(account, folders, cursors))
+/** `names` (folder path → full name) finds folders chosen on a device using the other protocol */
+export function checkNewMail(account: AccountSettings, folders: string[], cursors: Cursors, names: Record<string, string> = {}): Promise<NewMail> {
+  return inBackground(() => checkNow(account, folders, cursors, names))
 }
 
-async function checkNow(account: AccountSettings, folders: string[], cursors: Cursors): Promise<NewMail> {
+/** The chosen folders as this account names them; the Inbox needs no lookup */
+async function localFolders(account: AccountSettings, chosen: string[], names: Record<string, string>): Promise<string[]> {
+  if (chosen.every(path => path === 'INBOX')) return chosen
+  const folders = await mailFor(account).listFolders()
+  return [...new Set(chosen.flatMap((path) => {
+    const folder = matchFolder(folders, path, names[path])
+    return folder ? [folder.path] : []
+  }))]
+}
+
+async function checkNow(account: AccountSettings, chosen: string[], cursors: Cursors, names: Record<string, string>): Promise<NewMail> {
   if (account.incoming.protocol === 'pop3') return checkPop3(account, cursors)
+  const folders = await localFolders(account, chosen, names)
   if (account.incoming.protocol === 'jmap') return checkJmap(account, folders, cursors)
   const result: NewMail = { cursors: {}, messages: [] }
   // Reports for messages you tracked are marked read first, so they show as

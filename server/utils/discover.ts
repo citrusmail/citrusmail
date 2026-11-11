@@ -338,14 +338,13 @@ async function wellKnownJmap(host: string, port = 443): Promise<string | undefin
 }
 
 export async function findJmap(domain: string, mailHost?: string): Promise<string | undefined> {
-  const record = await withTimeout(srv(`_jmap._tcp.${domain}`))
-  const hosts = [
-    ...(record ? [{ host: record.host, port: record.port }] : []),
-    { host: domain, port: 443 },
-    ...(mailHost && /[a-z]/i.test(mailHost) && !mailHost.includes(':') ? [{ host: mailHost, port: 443 }] : [])
-  ]
-  const found = await Promise.all(hosts.map(h => withTimeout(wellKnownJmap(h.host, h.port))))
-  return found.find(Boolean)
+  const hosts = [domain, ...(mailHost && /[a-z]/i.test(mailHost) && !mailHost.includes(':') && mailHost !== domain ? [mailHost] : [])]
+  // All at once, so a host that never answers costs one timeout, not one after another
+  const [fromSrv, ...found] = await Promise.all([
+    withTimeout(srv(`_jmap._tcp.${domain}`)).then(record => record ? withTimeout(wellKnownJmap(record.host, record.port)) : undefined),
+    ...hosts.map(host => withTimeout(wellKnownJmap(host)))
+  ])
+  return fromSrv ?? found.find(Boolean)
 }
 
 /* ------------------------------------------------------------------ */

@@ -8,7 +8,7 @@ defineProps<{
 const { account } = useShell()
 
 // Mail that isn't a folder on the server: the lists you're on
-const extras = computed<NavigationMenuItem[]>(() => account.value?.protocol === 'imap'
+const extras = computed<NavigationMenuItem[]>(() => account.value && account.value.protocol !== 'pop3'
   ? [{ label: 'Subscriptions', icon: 'i-lucide-newspaper', to: '/subscriptions' }]
   : [])
 </script>

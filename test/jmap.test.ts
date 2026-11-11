@@ -187,14 +187,14 @@ const MAILBOXES: JmapMailbox[] = [
 describe('mailboxes', () => {
   it('turns mailboxes into folders: roles first, then the tree in order', () => {
     expect(jmapFolders(MAILBOXES)).toEqual([
-      { path: 'INBOX', name: 'Inbox', role: 'inbox', unread: 5, depth: 0 },
-      { path: 'd', name: 'Drafts', role: 'drafts', unread: 0, depth: 0 },
-      { path: 'trash', name: 'Deleted', role: 'trash', unread: 0, depth: 0 },
-      { path: 'imp', name: 'Important', role: undefined, unread: 0, depth: 0 },
-      { path: 'a', name: 'Aardvark', role: undefined, unread: 0, depth: 0 },
-      { path: 'p', name: 'Projects', role: undefined, unread: 2, depth: 0 },
-      { path: 'c', name: 'Citrus', role: undefined, unread: 0, depth: 1 },
-      { path: 'cc', name: 'Deep', role: undefined, unread: 0, depth: 2 }
+      { path: 'INBOX', name: 'Inbox', role: 'inbox', unread: 5, depth: 0, fullName: 'INBOX' },
+      { path: 'd', name: 'Drafts', role: 'drafts', unread: 0, depth: 0, fullName: 'Drafts' },
+      { path: 'trash', name: 'Deleted', role: 'trash', unread: 0, depth: 0, fullName: 'Deleted' },
+      { path: 'imp', name: 'Important', role: undefined, unread: 0, depth: 0, fullName: 'Important' },
+      { path: 'a', name: 'Aardvark', role: undefined, unread: 0, depth: 0, fullName: 'Aardvark' },
+      { path: 'p', name: 'Projects', role: undefined, unread: 2, depth: 0, fullName: 'Projects' },
+      { path: 'c', name: 'Citrus', role: undefined, unread: 0, depth: 1, fullName: 'Projects/Citrus' },
+      { path: 'cc', name: 'Deep', role: undefined, unread: 0, depth: 2, fullName: 'Projects/Citrus/Deep' }
     ])
   })
 

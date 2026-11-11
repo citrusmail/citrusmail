@@ -357,7 +357,8 @@ export function jmapFolders(all: JmapMailbox[]): Folder[] {
         name: role === 'inbox' ? 'Inbox' : m.name,
         role,
         unread: m.unreadEmails ?? 0,
-        depth: role ? 0 : chain.length
+        depth: role ? 0 : chain.length,
+        fullName: m.role === 'inbox' ? JMAP_INBOX : [...chain, m].map(p => p.name).join('/')
       } as Folder,
       // Tree order: each folder right after its parent, siblings by sortOrder then name
       key: [...chain, m].map(p => `${String(p.sortOrder ?? 0).padStart(10, '0')}${p.name.toLowerCase()}`).join('\u0000')
@@ -569,7 +570,9 @@ export function jmapRuleFilter(rule: Pick<MailRule, 'conditions' | 'match' | 'af
     .map(({ field, value }) => ({ [field]: value.trim() }))
   if (!parts.length) return undefined
   const conditions = rule.match === 'any' && parts.length > 1 ? [{ operator: 'OR', conditions: parts }] : parts
-  if (rule.after?.validity === JMAP_RULE_MARK) conditions.push({ after: new Date(rule.after.uid).toISOString() })
+  // Marks made over IMAP carry their time in `at`; older JMAP marks only in `uid`
+  const at = rule.after?.at ?? (rule.after?.validity === JMAP_RULE_MARK ? rule.after.uid : undefined)
+  if (at !== undefined) conditions.push({ after: new Date(at).toISOString() })
   return and(conditions)
 }
 

@@ -129,6 +129,8 @@ export interface Folder {
   unread: number
   /** Nesting depth for display */
   depth: number
+  /** JMAP: the names from the top down, joined by / (IMAP's path is already its full name) */
+  fullName?: string
 }
 
 export interface Address {
@@ -343,6 +345,8 @@ export interface NotificationSettings {
   push: boolean
   /** Mailbox email → folder paths to notify for; a mailbox missing here gets its Inbox */
   folders: Record<string, string[]>
+  /** Mailbox email → folder path → its full name, so a device on the other protocol finds the folder (set by the server) */
+  folderNames?: Record<string, Record<string, string>>
   /** Mailboxes that never notify */
   muted: string[]
   /** HH:mm to HH:mm, local time; empty for none */
@@ -417,9 +421,14 @@ export interface MailRule {
   conditions: RuleCondition[]
   /** Folder path the matching mail moves to */
   folder: string
+  /** The folder's full name when the rule was saved, so a device on the other protocol finds it */
+  folderName?: string
   markRead: boolean
-  /** Only Inbox mail from this UID on, so a new rule leaves older mail alone */
-  after?: { validity: string, uid: number }
+  /**
+   * Only Inbox mail from this point on, so a new rule leaves older mail alone:
+   * a UID under that UIDVALIDITY over IMAP, and `at` (ms) on any protocol
+   */
+  after?: { validity: string, uid: number, at?: number }
 }
 
 /** A rule as the client saves it: the folder can be one that doesn't exist yet */

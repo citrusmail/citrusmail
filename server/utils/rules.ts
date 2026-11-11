@@ -10,9 +10,49 @@ function criteriaFor(rule: MailRule, validity: string): SearchObject | undefined
   const criteria: SearchObject = rule.match === 'any' && parts.length > 1
     ? { or: parts }
     : Object.assign({}, ...parts)
-  // A rule saved without "apply to existing" only sees mail that arrived after it
+  // A rule saved without "apply to existing" only sees mail that arrived after
+  // it: by UID when the mark is this Inbox's, otherwise by the time it was made
+  // (SEARCH SINCE is by day, so fileFrom drops what came earlier that day)
   if (rule.after && rule.after.validity === validity) criteria.uid = `${rule.after.uid}:*`
+  else if (rule.after?.at) criteria.since = new Date(rule.after.at)
   return criteria
+}
+
+/** When a rule starts, for a mark that isn't this Inbox's UIDs */
+function notBefore(rule: MailRule, validity: string) {
+  return rule.after && rule.after.validity !== validity ? rule.after.at : undefined
+}
+
+/**
+ * Gives every start mark a time, once. Marks made before marks carried one
+ * (or by a device on the other protocol) would otherwise read as "no start",
+ * and the rule would sweep all the mail already in the Inbox
+ */
+async function stampRules(account: AccountSettings, rules: MailRule[]): Promise<MailRule[]> {
+  if (!rules.some(rule => rule.after && rule.after.at === undefined)) return rules
+  const now = Date.now()
+  const stamped = rules.map(rule => rule.after && rule.after.at === undefined
+    ? { ...rule, after: { ...rule.after, at: rule.after.validity === 'jmap' ? rule.after.uid : now } }
+    : rule)
+  await writeStore(account, 'rules', stamped)
+  return stamped
+}
+
+/**
+ * The enabled rules with their folders as this account names them. A rule
+ * whose folder isn't here (deleted, or saved on a device using the other
+ * protocol and not found by name) is left out: it never marks mail read
+ * without being able to move it
+ */
+export async function localRules(account: AccountSettings): Promise<MailRule[]> {
+  const saved = await readStore<MailRule[]>(account, 'rules', [])
+  if (!saved.some(rule => rule.enabled && rule.folder)) return []
+  const rules = await stampRules(account, saved)
+  const folders = await mailFor(account).listFolders()
+  return rules.filter(rule => rule.enabled && rule.folder).flatMap((rule) => {
+    const folder = matchFolder(folders, rule.folder, rule.folderName)
+    return folder && folder.role !== 'inbox' ? [{ ...rule, folder: folder.path }] : []
+  })
 }
 
 /**
@@ -50,7 +90,7 @@ async function runRulesNow(account: AccountSettings, force: boolean): Promise<nu
 }
 
 async function runJmapRules(account: AccountSettings): Promise<number> {
-  const rules = (await readStore<MailRule[]>(account, 'rules', [])).filter(rule => rule.enabled && rule.folder)
+  const rules = await localRules(account)
   return rules.length ? jmapRunRules(account, rules) : 0
 }
 
@@ -61,10 +101,16 @@ function parentsOf(rule: MailRule, rules: MailRule[]) {
     .filter(folder => folder !== rule.folder && /^[/.]/.test(rule.folder.slice(folder.length)) && rule.folder.startsWith(folder)))]
 }
 
-async function fileFrom(account: AccountSettings, source: string, rule: MailRule, criteria: SearchObject) {
+async function fileFrom(account: AccountSettings, source: string, rule: MailRule, criteria: SearchObject, from?: number) {
   return withMailbox(account, source, async (client) => {
-    const uids = await client.search(criteria, { uid: true }).catch(() => false)
+    let uids = await client.search(criteria, { uid: true }).catch(() => false)
     if (!Array.isArray(uids) || !uids.length) return 0
+    if (from !== undefined) {
+      const arrived = await client.fetchAll(uids.join(','), { uid: true, internalDate: true }, { uid: true })
+      const keep = new Set(arrived.filter(msg => new Date(msg.internalDate ?? 0).getTime() >= from).map(msg => msg.uid))
+      uids = uids.filter(uid => keep.has(uid))
+      if (!uids.length) return 0
+    }
     const range = uids.join(',')
     if (rule.markRead) await client.messageFlagsAdd(range, ['\\Seen'], { uid: true })
     return await client.messageMove(range, rule.folder, { uid: true }).catch(() => false) ? uids.length : 0
@@ -72,7 +118,7 @@ async function fileFrom(account: AccountSettings, source: string, rule: MailRule
 }
 
 async function runFolderRules(account: AccountSettings): Promise<number> {
-  const all = (await readStore<MailRule[]>(account, 'rules', [])).filter(rule => rule.enabled && rule.folder)
+  const all = await localRules(account)
   if (!all.length) return 0
   // The most specific folder wins: with "AWS" and "AWS/Failures" both
   // matching, the message goes to Failures, whatever order the rules are in
@@ -85,7 +131,7 @@ async function runFolderRules(account: AccountSettings): Promise<number> {
   let moved = 0
   for (const rule of rules) {
     const criteria = criteriaFor(rule, validity)
-    if (criteria) moved += await fileFrom(account, 'INBOX', rule, criteria)
+    if (criteria) moved += await fileFrom(account, 'INBOX', rule, criteria, notBefore(rule, validity))
   }
   // A rule that applies to existing mail also sorts what its parent folder's
   // rule already filed there, so adding "AWS/Successes" after "AWS" still works
@@ -102,6 +148,7 @@ export async function inboxMark(account: AccountSettings): Promise<MailRule['aft
   if (account.incoming.protocol === 'jmap') return jmapRuleMark()
   return withMailbox(account, 'INBOX', async client => ({
     validity: String(client.mailbox ? client.mailbox.uidValidity : ''),
-    uid: client.mailbox ? Number(client.mailbox.uidNext) : 1
+    uid: client.mailbox ? Number(client.mailbox.uidNext) : 1,
+    at: Date.now()
   }))
 }
