@@ -56,6 +56,24 @@ const STOPWORDS: Record<string, string[]> = {
 }
 
 /**
+ * The part of a message its sender wrote: without the quoted message under a
+ * reply ("> …" lines, and everything from "On … wrote:", "-----Original
+ * Message-----" or a forwarded header block on), and without links and
+ * addresses. A reply in English to a message in Spanish is in English
+ */
+export function writtenPart(text: string): string {
+  const lines = text.split(/\r?\n/)
+  const cut = lines.findIndex((line, i) =>
+    /^\s*(On\b.{0,200}\bwrote:|Le\b.{0,200}\ba écrit\s*:|Am\b.{0,200}\bschrieb\b.*:|El\b.{0,200}\bescribió:)\s*$/i.test(line)
+    || /^\s*-{2,}\s*(Original Message|Forwarded message|Mensaje original|Message d'origine|Ursprüngliche Nachricht)\s*-{2,}/i.test(line)
+    || (/^\s*From:\s/i.test(line) && /^\s*(Sent|Date|To|Subject):\s/i.test(lines[i + 1] ?? '')))
+  return (cut === -1 ? lines : lines.slice(0, cut))
+    .filter(line => !/^\s*>/.test(line))
+    .join('\n')
+    .replace(/\bhttps?:\/\/\S+|\bwww\.\S+|\S+@\S+\.\S+/gi, ' ')
+}
+
+/**
  * The language a text is most likely in, or undefined when it can't tell.
  * Scripts decide at once; Latin-script languages go by their common words
  */
