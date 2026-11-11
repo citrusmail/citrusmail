@@ -76,14 +76,21 @@ defineShortcuts({ '[': () => !isMobile.value && toggleSidebar() })
     </template>
 
     <template #footer="{ state }">
-      <div
-        class="flex items-center gap-1 w-full"
-        :class="state === 'collapsed' && 'flex-col-reverse'"
-      >
-        <div class="flex-1 min-w-0 flex justify-center">
-          <UserMenu :collapsed="state === 'collapsed'" />
+      <div class="flex flex-col gap-2 w-full">
+        <OpenSourceNote
+          v-if="state === 'expanded'"
+          short
+          class="px-2"
+        />
+        <div
+          class="flex items-center gap-1 w-full"
+          :class="state === 'collapsed' && 'flex-col-reverse'"
+        >
+          <div class="flex-1 min-w-0 flex justify-center">
+            <UserMenu :collapsed="state === 'collapsed'" />
+          </div>
+          <SidebarFoldButton :collapsed="state === 'collapsed'" />
         </div>
-        <SidebarFoldButton :collapsed="state === 'collapsed'" />
       </div>
     </template>
   </USidebar>

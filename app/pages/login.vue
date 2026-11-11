@@ -29,9 +29,12 @@ const panel = computed(() => {
         />
       </div>
 
-      <p class="text-xs text-muted max-w-[25rem] mx-auto lg:mx-0 lg:ms-[max(0px,calc(50%-12.5rem))]">
-        Your password goes only to your mail server. {{ brand.name }} keeps it in an encrypted cookie in this browser and stores nothing else.
-      </p>
+      <div class="flex flex-col gap-2 max-w-[25rem] mx-auto lg:mx-0 lg:ms-[max(0px,calc(50%-12.5rem))]">
+        <p class="text-xs text-muted">
+          Your password goes only to your mail server. {{ brand.name }} keeps it in an encrypted cookie in this browser and stores nothing else.
+        </p>
+        <OpenSourceNote />
+      </div>
     </section>
 
     <section

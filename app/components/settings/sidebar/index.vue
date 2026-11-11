@@ -20,7 +20,8 @@ const items = computed<NavigationMenuItem[]>(() => [
   ...(imap.value ? [{ label: 'Senders', icon: 'i-lucide-shield-check', to: '/settings/senders' }] : []),
   ...(imap.value ? [{ label: 'Rules', icon: 'i-lucide-list-filter', to: '/settings/rules' }] : []),
   { label: 'Tracking', icon: 'i-lucide-mail-check', to: '/settings/tracking' },
-  { label: 'AI', icon: 'i-lucide-sparkles', to: '/settings/ai' }
+  { label: 'AI', icon: 'i-lucide-sparkles', to: '/settings/ai' },
+  { label: 'About', icon: 'i-lucide-info', to: '/settings/about' }
 ])
 </script>
 
