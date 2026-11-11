@@ -115,6 +115,7 @@ Set these variables and people only enter an email and a password: the server se
 | Variable | What it does |
 | --- | --- |
 | `NUXT_APP_SECRET` | **Required.** At least 32 random characters, used to encrypt the session cookie: `openssl rand -base64 32` |
+| `NUXT_SESSION_NAME` | The session cookie's name, `citrusmail-session` by default. Give each instance its own when several run on one host, since browsers share cookies across ports |
 | `NUXT_MAIL_ALLOW_PRIVATE_HOSTS` | `true` if your mail server is on a private network. Off by default, so the server can't be pointed at internal machines |
 | `NUXT_TRUST_PROXY` | `true` behind a reverse proxy, so rate limits see each visitor's address |
 | `NUXT_FAIVELO_URL` | `https://faivelo.com` to let [Faivelo](https://faivelo.com) mailboxes have Faivelo track their opens. Off by default |
