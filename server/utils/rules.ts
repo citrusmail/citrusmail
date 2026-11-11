@@ -34,15 +34,24 @@ export function runRules(account: AccountSettings, force = false): Promise<numbe
 }
 
 async function runRulesNow(account: AccountSettings, force: boolean): Promise<number> {
-  if (account.incoming.protocol !== 'imap') return 0
+  const { protocol } = account.incoming
+  // POP3 has no folders to file into
+  if (protocol === 'pop3') return 0
+  const jmap = protocol === 'jmap'
+  const mark = () => (jmap ? jmapInboxState(account) : inboxMarkOf(account)).catch(() => '')
   const key = accountKey(account)
-  const before = await inboxMarkOf(account).catch(() => '')
+  const before = await mark()
   if (!force && before && lastInbox.get(key) === before) return 0
   await collectReceipts(account).catch(() => 0)
   const screened = await applySenderLists(account).catch(() => 0)
-  const moved = screened + await runFolderRules(account)
-  lastInbox.set(key, moved ? await inboxMarkOf(account).catch(() => '') : before)
+  const moved = screened + (jmap ? await runJmapRules(account) : await runFolderRules(account))
+  lastInbox.set(key, moved ? await mark() : before)
   return moved
+}
+
+async function runJmapRules(account: AccountSettings): Promise<number> {
+  const rules = (await readStore<MailRule[]>(account, 'rules', [])).filter(rule => rule.enabled && rule.folder)
+  return rules.length ? jmapRunRules(account, rules) : 0
 }
 
 /** Folders other rules file into that contain this rule's folder ("AWS" for "AWS/Failures") */
@@ -90,6 +99,7 @@ async function runFolderRules(account: AccountSettings): Promise<number> {
 
 /** Where a new rule starts when it shouldn't touch mail already in the Inbox */
 export async function inboxMark(account: AccountSettings): Promise<MailRule['after']> {
+  if (account.incoming.protocol === 'jmap') return jmapRuleMark()
   return withMailbox(account, 'INBOX', async client => ({
     validity: String(client.mailbox ? client.mailbox.uidValidity : ''),
     uid: client.mailbox ? Number(client.mailbox.uidNext) : 1

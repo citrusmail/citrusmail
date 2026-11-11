@@ -86,7 +86,7 @@ export function composeMessage(account: AccountSettings, message: OutgoingMessag
 }
 
 /** Hands a built message to something other than SMTP (a JMAP server); `sentCopy` is the one for Sent */
-export type Deliver = (raw: Buffer, envelope: { from: string, to: string[] }, sentCopy: Buffer) => Promise<void>
+export type Deliver = (raw: Buffer, envelope: { from: string, to: string[] }, sentCopy: Buffer, dsn?: { id: string }) => Promise<void>
 
 /** Sends over the account's SMTP server, or `deliver`, and returns the raw message, for the Sent folder */
 export async function sendMail(account: AccountSettings, message: OutgoingMessage, deliver?: Deliver): Promise<{ messageId: string, raw: Buffer }> {
@@ -111,7 +111,8 @@ export async function sendMail(account: AccountSettings, message: OutgoingMessag
   const raw = await node.build()
   if (deliver) {
     const copy = pixel ? await sentCopy.build() : raw
-    await deliver(raw, { from: account.email, to: envelope.to }, copy)
+    // Tracked mail asks for delivery reports there too, by the same envelope id
+    await deliver(raw, { from: account.email, to: envelope.to }, copy, pixel ? { id: messageId } : undefined)
     if (pixel) await markTracked(account, messageId).catch(() => {})
     return { messageId, raw: copy }
   }

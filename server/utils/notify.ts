@@ -69,6 +69,8 @@ async function checkPop3(account: AccountSettings, cursors: Cursors): Promise<Ne
 /** JMAP ids don't grow either: the newest unread message's time stands in, per folder */
 async function checkJmap(account: AccountSettings, folders: string[], cursors: Cursors): Promise<NewMail> {
   const result: NewMail = { cursors: {}, messages: [] }
+  // Reports for tracked messages are marked read first, as on IMAP
+  if (folders.includes('INBOX')) await collectReceipts(account).catch(() => 0)
   const mail = mailFor(account)
   for (const path of folders) {
     try {

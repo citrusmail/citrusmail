@@ -55,7 +55,7 @@ export function mailFor(account: AccountSettings) {
      */
     async send(message: OutgoingMessage): Promise<{ messageId: string }> {
       if (account.incoming.protocol === 'jmap' && await jmapCanSubmit(account)) {
-        return sendMail(account, message, (raw, envelope, sentCopy) => jmapBackend.submit(account, raw, envelope, sentCopy))
+        return sendMail(account, message, (raw, envelope, sentCopy, dsn) => jmapBackend.submit(account, raw, envelope, sentCopy, dsn))
       }
       const sent = await sendMail(account, message)
       // The message is out: a Sent folder that can't be written to is not worth an error

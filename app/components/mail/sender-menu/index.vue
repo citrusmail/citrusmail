@@ -13,8 +13,7 @@ const address = computed(() => props.message.from.address)
 const domain = computed(() => `@${address.value.split('@')[1] ?? ''}`)
 
 const items = computed<DropdownMenuItem[][]>(() => {
-  // The lists are applied over IMAP
-  if (!address.value || account.value?.protocol !== 'imap') return []
+  if (!address.value || account.value?.protocol === 'pop3') return []
   const allowed = isAllowed(address.value)
   const blocked = isBlocked(address.value)
   return [[

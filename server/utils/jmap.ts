@@ -309,6 +309,13 @@ const ORDER: FolderRole[] = ['inbox', 'drafts', 'sent', 'archive', 'junk', 'tras
 /** The Inbox keeps the path INBOX, as on IMAP and POP3; every other folder is its mailbox id */
 export const JMAP_INBOX = 'INBOX'
 
+/** Where settings live in the mailbox, never shown as a folder: the same name as IMAP's SYNC_FOLDER (mail-imap.ts) */
+export const JMAP_SYNC_FOLDER = 'CitrusMail Settings'
+
+export function isJmapSyncFolder(mailbox: JmapMailbox): boolean {
+  return !mailbox.parentId && mailbox.name === JMAP_SYNC_FOLDER
+}
+
 export function jmapFolderPath(mailbox: JmapMailbox): string {
   return mailbox.role === 'inbox' ? JMAP_INBOX : mailbox.id
 }
@@ -329,7 +336,8 @@ export function jmapMailboxTree(mailboxes: JmapMailbox[], id: string): JmapMailb
   return mailboxes.filter(inside).sort((a, b) => depth(b) - depth(a))
 }
 
-export function jmapFolders(mailboxes: JmapMailbox[]): Folder[] {
+export function jmapFolders(all: JmapMailbox[]): Folder[] {
+  const mailboxes = all.filter(m => !isJmapSyncFolder(m))
   const byId = new Map(mailboxes.map(m => [m.id, m]))
   const ancestors = (m: JmapMailbox) => {
     const chain: JmapMailbox[] = []
@@ -542,4 +550,60 @@ export function pickJmapIdentity(identities: { id: string, email: string }[], em
   return (identities.find(i => i.email.toLowerCase() === address)
     ?? identities.find(i => i.email.toLowerCase() === `*@${domain}`)
     ?? identities[0])?.id
+}
+
+/* ------------------------------------------------------------------ */
+/* Rules, sender lists and reports                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A rule's `after` mark on JMAP: there are no UIDs that grow, so the mark is
+ * the time the rule was saved (ms), and only mail received since then counts
+ */
+export const JMAP_RULE_MARK = 'jmap'
+
+/** A rule as an Email/query filter, without the mailbox; undefined when it has no conditions */
+export function jmapRuleFilter(rule: Pick<MailRule, 'conditions' | 'match' | 'after'>): Filter | undefined {
+  const parts: Filter[] = rule.conditions
+    .filter(condition => condition.value.trim())
+    .map(({ field, value }) => ({ [field]: value.trim() }))
+  if (!parts.length) return undefined
+  const conditions = rule.match === 'any' && parts.length > 1 ? [{ operator: 'OR', conditions: parts }] : parts
+  if (rule.after?.validity === JMAP_RULE_MARK) conditions.push({ after: new Date(rule.after.uid).toISOString() })
+  return and(conditions)
+}
+
+/** Mail from any of these senders (FROM is a substring match, so @example.com finds the domain) */
+export function jmapFromFilter(entries: string[]): Filter | undefined {
+  if (!entries.length) return undefined
+  return entries.length === 1 ? { from: entries[0] } : { operator: 'OR', conditions: entries.map(from => ({ from })) }
+}
+
+/** The Content-Type header asked for with each message, to pick out reports */
+export const JMAP_CONTENT_TYPE = 'header:Content-Type'
+
+/**
+ * Read receipts (RFC 8098) and delivery reports (RFC 3464), by their
+ * Content-Type. Checked here rather than with a header filter in the query,
+ * which not every server can search (Stalwart finds nothing)
+ */
+export function isJmapReport(email: JmapEmail): boolean {
+  const type = (email as unknown as Record<string, unknown>)[JMAP_CONTENT_TYPE]
+  return typeof type === 'string' && /\b(disposition-notification|delivery-status)\b/i.test(type)
+}
+
+/** RFC 3461 xtext: what an ENVID may carry on the MAIL FROM line */
+function xtext(value: string) {
+  return value.replace(/[^\x21-\x7E]|[+=]/g, char => `+${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)
+}
+
+/**
+ * The EmailSubmission envelope. With `dsn`, it asks each recipient's server
+ * for a delivery report (RFC 3461), as the SMTP path does for tracked mail
+ */
+export function jmapEnvelope(from: string, to: string[], dsn?: { id: string }) {
+  return {
+    mailFrom: { email: from, ...(dsn ? { parameters: { RET: 'HDRS', ENVID: xtext(dsn.id) } } : {}) },
+    rcptTo: to.map(email => ({ email, ...(dsn ? { parameters: { NOTIFY: 'SUCCESS,FAILURE' } } : {}) }))
+  }
 }

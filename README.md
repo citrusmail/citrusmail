@@ -79,10 +79,10 @@ The sign-in page then shows **Sign in with Microsoft** for those addresses. The 
 - **Entering it yourself**: choose **JMAP** under **Server settings → Incoming** and type the server in one field: a name (`mail.example.com`, which means `https://mail.example.com/.well-known/jmap`), a URL with a port (`http://127.0.0.1:8080`) or the session URL itself (Fastmail: `https://api.fastmail.com/jmap/session`). A redirect is only followed on the same host, so the password never goes anywhere else.
 - **Password or token**: type your password, an app password or an API token. CitrusMail tries it as a password (Basic auth), then as a token (Bearer), and remembers which worked. Fastmail's JMAP takes an API token, made under Settings → Privacy & Security → Manage API tokens. With an app password, Fastmail signs in over IMAP instead.
 - **Sending**: when the server offers JMAP submission, mail goes out through it (EmailSubmission) and lands in Sent on its own, so SMTP settings are optional. Otherwise CitrusMail sends over the SMTP server under **Outgoing** and files a copy in Sent.
-- **What works**: folders (create, rename, delete), the message list with search and filters, reading, attachments, the original message, read and flagged, move, delete (to Trash, or for good from Trash), drafts, AI search and new-mail notifications.
-- **Not yet over JMAP**: sender allow and block lists, rules, settings sync, the subscriptions page and read receipts collection. These still need IMAP. Push uses the minute-by-minute check, not JMAP push.
+- **What works**: folders (create, rename, delete), the message list with search and filters, reading, attachments, the original message, read and flagged, move, delete (to Trash, or for good from Trash), drafts, AI search, new-mail notifications, sender allow and block lists, rules, read receipts and delivery reports, and settings that follow you (kept in an unsubscribed **CitrusMail Settings** mailbox, as over IMAP).
+- **Not yet over JMAP**: the subscriptions page. Notifications use the minute-by-minute check, not JMAP push.
 
-Tested against [Stalwart](https://stalw.art) 1.1. It is written to the RFCs and should work with [Fastmail](https://www.fastmail.com) and [Cyrus IMAP](https://www.cyrusimap.org) 3.x, but they haven't been tested yet: reports are welcome.
+Tested against [Stalwart](https://stalw.art) 1.1 and 0.11. It is written to the RFCs and should work with [Fastmail](https://www.fastmail.com) and [Cyrus IMAP](https://www.cyrusimap.org) 3.x, but they haven't been tested yet: reports are welcome.
 
 To pin a JMAP server for everyone, set `NUXT_MAIL_JMAP_URL` (or `NUXT_MAIL_JMAP_HOST`), below.
 

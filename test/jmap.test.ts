@@ -3,6 +3,7 @@ import {
   JMAP_CORE, JMAP_ID, JMAP_MAIL, JMAP_SUBMISSION, JmapError, fillJmapTemplate, jmapAuthHeader, jmapDownload,
   jmapFlagPatch, jmapFolderOf, jmapHasAttachments, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
   jmapRequest, jmapSearchFilter, jmapSession, jmapSessionUrl, jmapSetResult, jmapSummary, jmapUpload,
+  JMAP_RULE_MARK, isJmapReport, jmapEnvelope, jmapFromFilter, jmapRuleFilter,
   jmapSignIn, parseJmapSession, pickJmapIdentity, readJmapPage, readJmapResponses
 } from '../server/utils/jmap'
 import { jmapIncoming, jmapServerText } from '../shared/utils/jmap-server'
@@ -389,5 +390,48 @@ describe('sign-in', () => {
     const unicode = signInServer('none')
     await jmapSignIn({ ...account(), password: 'pässwörd' }, unicode.fetch).catch(() => {})
     expect(unicode.tried).toEqual(['basic'])
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/* Rules, sender lists, reports and settings                           */
+/* ------------------------------------------------------------------ */
+
+describe('settings features', () => {
+  it('hides the settings folder from the folder list', () => {
+    expect(jmapFolders([{ id: 'in', name: 'Inbox', role: 'inbox' }, { id: 's', name: 'CitrusMail Settings' }, { id: 'k', name: 'CitrusMail Settings', parentId: 'in' }]).map(f => f.path))
+      .toEqual(['INBOX', 'k'])
+  })
+
+  it('turns a rule into a filter: all, any, and only mail since it was saved', () => {
+    const conditions = [{ field: 'from' as const, value: ' aws ' }, { field: 'subject' as const, value: 'Failed' }, { field: 'to' as const, value: ' ' }]
+    expect(jmapRuleFilter({ conditions, match: 'all' })).toEqual({ operator: 'AND', conditions: [{ from: 'aws' }, { subject: 'Failed' }] })
+    expect(jmapRuleFilter({ conditions, match: 'any' })).toEqual({ operator: 'OR', conditions: [{ from: 'aws' }, { subject: 'Failed' }] })
+    expect(jmapRuleFilter({ conditions: conditions.slice(0, 1), match: 'any', after: { validity: JMAP_RULE_MARK, uid: Date.parse('2026-11-11T00:00:00Z') } }))
+      .toEqual({ operator: 'AND', conditions: [{ from: 'aws' }, { after: '2026-11-11T00:00:00.000Z' }] })
+    // An IMAP mark means nothing here, as a stale UIDVALIDITY means nothing on IMAP
+    expect(jmapRuleFilter({ conditions: conditions.slice(0, 1), match: 'all', after: { validity: '12345', uid: 7 } })).toEqual({ from: 'aws' })
+    expect(jmapRuleFilter({ conditions: [{ field: 'from', value: '  ' }], match: 'all' })).toBeUndefined()
+  })
+
+  it('finds mail from any of the listed senders', () => {
+    expect(jmapFromFilter([])).toBeUndefined()
+    expect(jmapFromFilter(['spam@example.com'])).toEqual({ from: 'spam@example.com' })
+    expect(jmapFromFilter(['a@x.com', '@y.com'])).toEqual({ operator: 'OR', conditions: [{ from: 'a@x.com' }, { from: '@y.com' }] })
+  })
+
+  it('finds read receipts and delivery reports by their Content-Type', () => {
+    expect(isJmapReport({ 'id': 'a', 'header:Content-Type': ' multipart/report; report-type=disposition-notification; boundary="b"' } as never)).toBe(true)
+    expect(isJmapReport({ 'id': 'b', 'header:Content-Type': ' multipart/report;\r\n report-type=delivery-status' } as never)).toBe(true)
+    expect(isJmapReport({ 'id': 'c', 'header:Content-Type': ' text/plain' } as never)).toBe(false)
+    expect(isJmapReport({ id: 'd' })).toBe(false)
+  })
+
+  it('asks for delivery reports on tracked mail, with the envelope id as xtext', () => {
+    expect(jmapEnvelope('me@x.com', ['a@y.com'])).toEqual({ mailFrom: { email: 'me@x.com' }, rcptTo: [{ email: 'a@y.com' }] })
+    expect(jmapEnvelope('me@x.com', ['a@y.com', 'b@y.com'], { id: '<a+b=c@x.com>' })).toEqual({
+      mailFrom: { email: 'me@x.com', parameters: { RET: 'HDRS', ENVID: '<a+2Bb+3Dc@x.com>' } },
+      rcptTo: [{ email: 'a@y.com', parameters: { NOTIFY: 'SUCCESS,FAILURE' } }, { email: 'b@y.com', parameters: { NOTIFY: 'SUCCESS,FAILURE' } }]
+    })
   })
 })

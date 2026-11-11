@@ -2,7 +2,7 @@ import { createError } from 'nuxt/server'
 import { simpleParser } from 'mailparser'
 import type { ListQuery } from './mail-imap'
 import {
-  JMAP_ID, JMAP_INBOX, JMAP_MAX_BLOB, JmapError, findJmapMailbox, findJmapRole, jmapDownload, jmapFlagPatch,
+  JMAP_ID, JMAP_INBOX, JMAP_MAX_BLOB, JmapError, isJmapSyncFolder, jmapEnvelope, findJmapMailbox, findJmapRole, jmapDownload, jmapFlagPatch,
   jmapFolderOf, jmapFolderPath, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
   jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapSignIn, jmapUpload, pickJmapIdentity, readJmapPage
 } from './jmap'
@@ -115,6 +115,9 @@ export async function verifyJmap(account: AccountSettings): Promise<{ submission
 export async function jmapCanSubmit(account: AccountSettings): Promise<boolean> {
   return (await jmapSession(context(account))).submission
 }
+
+/** The building blocks, for the features beyond the backend (mail-jmap-extras.ts) */
+export const jmapOps = { context, accountId, call, mailboxes, roleMailbox, updateEmails, destroyEmail, importEmail, source }
 
 export const jmapBackend = {
   async listFolders(account: AccountSettings): Promise<Folder[]> {
@@ -263,7 +266,7 @@ export const jmapBackend = {
    * differs from what went out (the tracking image), the sent one is
    * destroyed instead and the clean copy filed
    */
-  async submit(account: AccountSettings, raw: Buffer, envelope: { from: string, to: string[] }, sentCopy: Buffer): Promise<void> {
+  async submit(account: AccountSettings, raw: Buffer, envelope: { from: string, to: string[] }, sentCopy: Buffer, dsn?: { id: string }): Promise<void> {
     const ctx = context(account)
     const list = await mailboxes(ctx)
     const drafts = await roleMailbox(ctx, 'drafts', true, list)
@@ -275,23 +278,22 @@ export const jmapBackend = {
 
     const id = await importEmail(ctx, raw, drafts.id, { $draft: true, $seen: true })
     const clean = sentCopy === raw || sentCopy.equals(raw)
-    const result = await call(ctx, 'EmailSubmission/set', {
-      create: {
-        send: {
-          identityId,
-          emailId: id,
-          envelope: { mailFrom: { email: envelope.from }, rcptTo: envelope.to.map(email => ({ email })) }
-        }
-      },
+    const create = (withDsn?: { id: string }) => call(ctx, 'EmailSubmission/set', {
+      create: { send: { identityId, emailId: id, envelope: jmapEnvelope(envelope.from, envelope.to, withDsn) } },
       ...(clean
         ? { onSuccessUpdateEmail: { '#send': { [`mailboxIds/${drafts.id}`]: null, [`mailboxIds/${sent.id}`]: true, 'keywords/$draft': null } } }
         : { onSuccessDestroyEmail: ['#send'] })
-    }).catch(async (error) => {
-      await destroyEmail(ctx, id).catch(() => {})
-      throw error
-    })
+    }).then(result => jmapSetResult(result, 'created', 'send'))
     try {
-      jmapSetResult(result, 'created', 'send')
+      // A server that won't take the delivery report request still sends
+      // without it. Only on a refusal (a JMAP error: nothing was sent), never
+      // a network error, which could leave the first one sent
+      await (dsn
+        ? create(dsn).catch((error) => {
+            if (error instanceof JmapError && error.type && error.type !== 'unauthorized') return create()
+            throw error
+          })
+        : create())
     } catch (error) {
       // Not sent: the copy made for sending shouldn't linger in Drafts
       await destroyEmail(ctx, id).catch(() => {})
@@ -307,7 +309,7 @@ export const jmapBackend = {
   async searchAll(account: AccountSettings, criteria: SearchLike, limit = 40): Promise<MessageSummary[]> {
     const ctx = context(account)
     const list = await mailboxes(ctx)
-    const skip = list.filter(m => m.role === 'trash' || m.role === 'junk').map(m => m.id)
+    const skip = list.filter(m => m.role === 'trash' || m.role === 'junk' || isJmapSyncFolder(m)).map(m => m.id)
     const conditions = [jmapSearchFilter(criteria), ...(skip.length ? [{ inMailboxOtherThan: skip }] : [])].filter(c => Object.keys(c).length)
     const filter = conditions.length > 1 ? { operator: 'AND', conditions } : conditions[0] ?? {}
     const page = readJmapPage(await jmapRequest(ctx, jmapQueryCalls(await accountId(ctx), filter, { limit })), email => jmapFolderOf(email, list))
