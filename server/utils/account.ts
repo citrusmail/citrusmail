@@ -17,22 +17,30 @@ export async function requireAccount(event: RequestEvent): Promise<AccountSettin
   return fresh
 }
 
-/** Logs in to the incoming and outgoing servers and logs out: the check before a session is created */
-export async function verifyAccount(account: AccountSettings): Promise<void> {
+/**
+ * Logs in to the incoming and outgoing servers and logs out: the check before
+ * a session is created. Returns the account as it signed in: for JMAP, with
+ * the way the password went (as a password or as an API token)
+ */
+export async function verifyAccount(account: AccountSettings): Promise<AccountSettings> {
   const { protocol } = account.incoming
+  const jmap = protocol === 'jmap' ? verifyJmap(account) : undefined
   const verifyIncoming: Promise<unknown> = protocol === 'pop3'
     ? withPop3(account, async () => {})
-    : protocol === 'jmap' ? verifyJmap(account) : verifyImap(account)
+    : jmap ?? verifyImap(account)
   // A JMAP server that sends mail itself needs no SMTP server; one that can't falls back to SMTP
-  const verifyOutgoing = protocol === 'jmap'
-    ? (verifyIncoming as Promise<{ submission: boolean }>).then(found => found.submission ? undefined : verifySmtp(account), () => undefined)
+  const verifyOutgoing = jmap
+    ? jmap.then(found => found.submission ? undefined : verifySmtp(account), () => undefined)
     : verifySmtp(account)
   const [incomingResult, outgoingResult] = await Promise.allSettled([verifyIncoming, verifyOutgoing])
   const failures = [
     incomingResult.status === 'rejected' ? describeMailError(incomingResult.reason, account.incoming, false) : undefined,
     outgoingResult.status === 'rejected' ? describeMailError(outgoingResult.reason, account.outgoing, false) : undefined
   ]
-  if (!failures[0] && !failures[1]) return
+  if (!failures[0] && !failures[1]) {
+    if (!jmap) return account
+    return { ...account, incoming: { ...account.incoming, auth: (await jmap).auth } }
+  }
   // The same wrong password usually fails both sides: say it once
   const messages = [...new Set(failures.filter(f => f).map(f => f!.message))]
   const message = failures[0]?.auth && failures[1]?.auth ? failures[0].message : messages.join(' ')

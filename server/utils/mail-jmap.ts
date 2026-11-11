@@ -4,7 +4,7 @@ import type { ListQuery } from './mail-imap'
 import {
   JMAP_ID, JMAP_INBOX, JMAP_MAX_BLOB, JmapError, findJmapMailbox, findJmapRole, jmapDownload, jmapFlagPatch,
   jmapFolderOf, jmapFolderPath, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
-  jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapUpload, pickJmapIdentity, readJmapPage
+  jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapSignIn, jmapUpload, pickJmapIdentity, readJmapPage
 } from './jmap'
 import type { JmapCall, JmapContext, JmapEmail, JmapMailbox, SearchLike } from './jmap'
 
@@ -103,14 +103,12 @@ function sameName(list: JmapMailbox[], parentId: string | null, name: string, ex
 }
 
 /**
- * Checks the session, the password and that the API URL the session names
- * answers (Core/echo costs nothing); used before a session cookie is made
+ * Checks the session, the password (or token: whichever it turns out to be)
+ * and the API URL; used before a session cookie is made
  */
-export async function verifyJmap(account: AccountSettings): Promise<{ submission: boolean }> {
-  const ctx = context(account)
-  const session = await jmapSession(ctx, true)
-  await jmapRequest(ctx, [['Core/echo', {}, '0']])
-  return { submission: session.submission }
+export async function verifyJmap(account: AccountSettings): Promise<{ submission: boolean, auth: 'basic' | 'bearer' }> {
+  const { auth, session } = await jmapSignIn(account, context(account).fetch)
+  return { submission: session.submission, auth }
 }
 
 /** Whether this account sends through the JMAP server instead of SMTP */

@@ -5,33 +5,39 @@ defineProps<{
 
 const incoming = defineModel<IncomingSettings>('incoming', { required: true })
 
-const protocols = [
-  { label: 'IMAP', value: 'imap' },
-  { label: 'POP3', value: 'pop3' },
-  { label: 'JMAP', value: 'jmap' }
-]
+const tabs = {
+  items: [
+    { label: 'IMAP', value: 'imap' },
+    { label: 'POP3', value: 'pop3' },
+    { label: 'JMAP', value: 'jmap' }
+  ],
+  content: false,
+  color: 'neutral' as const,
+  size: 'xs' as const,
+  class: 'w-44'
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-5">
-    <AuthServerFields
-      v-model:server="incoming"
-      title="Incoming mail"
-      :security-items="securityItems"
-    >
-      <UTabs
-        v-model="incoming.protocol"
-        :items="protocols"
-        :content="false"
-        color="neutral"
-        size="xs"
-        class="w-44"
-      />
-    </AuthServerFields>
-
-    <AuthJmapFields
-      v-if="incoming.protocol === 'jmap'"
-      v-model:incoming="incoming"
+  <!-- JMAP is one field; IMAP and POP3 have host, port and security -->
+  <AuthJmapFields
+    v-if="incoming.protocol === 'jmap'"
+    v-model:incoming="incoming"
+  >
+    <UTabs
+      v-model="incoming.protocol"
+      v-bind="tabs"
     />
-  </div>
+  </AuthJmapFields>
+  <AuthServerFields
+    v-else
+    v-model:server="incoming"
+    title="Incoming mail"
+    :security-items="securityItems"
+  >
+    <UTabs
+      v-model="incoming.protocol"
+      v-bind="tabs"
+    />
+  </AuthServerFields>
 </template>

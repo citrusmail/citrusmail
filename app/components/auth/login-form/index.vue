@@ -4,7 +4,7 @@ const props = defineProps<{
   signIn: ReturnType<typeof useSignIn>
 }>()
 
-const { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, useJmap } = props.signIn
+const { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, chooseJmap } = props.signIn
 
 // A Microsoft mailbox takes no password: the button hands over to Microsoft,
 // unless the person opened the server settings to use their own servers
@@ -50,7 +50,7 @@ const leadingIcon = computed(() => discovering.value ? 'i-lucide-loader-circle' 
       <AuthProviderHint
         :discovery="discovery"
         :jmap="form.incoming.protocol === 'jmap'"
-        @use-jmap="useJmap"
+        @choose-jmap="chooseJmap"
       />
 
       <AuthPasswordField

@@ -6,7 +6,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  useJmap: []
+  chooseJmap: [jmap: boolean]
 }>()
 </script>
 
@@ -51,7 +51,7 @@ const emit = defineEmits<{
   <AuthJmapOffer
     v-if="discovery?.jmap && !discovery.oauth"
     :active="jmap"
-    :token="discovery.jmapAuth === 'bearer'"
-    @use="emit('useJmap')"
+    :can-switch="Boolean(discovery.incoming)"
+    @choose="emit('chooseJmap', $event)"
   />
 </template>

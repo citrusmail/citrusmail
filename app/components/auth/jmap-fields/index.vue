@@ -1,54 +1,35 @@
 <script setup lang="ts">
-// JMAP's extras: where the session is, when it isn't /.well-known/jmap on
-// the host, and whether the password is sent as Basic auth or a bearer token
+// A JMAP server is one field: a host, a URL with a port, or the session URL.
+// Whether the password is a password or an API token is found at sign-in
 const incoming = defineModel<IncomingSettings>('incoming', { required: true })
 
-const authItems = [
-  { label: 'Password or app password', value: 'basic' },
-  { label: 'API token (Bearer)', value: 'bearer' }
-]
+/** What was typed, kept while it isn't a whole address yet */
+const draft = ref<string>()
 
-const url = computed({
-  get: () => incoming.value.url ?? '',
+const text = computed({
+  get: () => draft.value ?? jmapServerText(incoming.value),
   set: (value: string) => {
-    incoming.value.url = value.trim() || undefined
-    // The host, port and security above follow the URL, for the summary and SMTP fallback
-    try {
-      const parsed = new URL(value.trim())
-      const secure = parsed.protocol === 'https:'
-      Object.assign(incoming.value, { host: parsed.hostname.replace(/^\[|\]$/g, ''), port: Number(parsed.port) || (secure ? 443 : 80), security: secure ? 'tls' : 'none' })
-    } catch {
-      // Still being typed
-    }
-  }
-})
-
-const auth = computed({
-  get: () => incoming.value.auth ?? 'basic',
-  set: (value: 'basic' | 'bearer') => {
-    incoming.value.auth = value
+    draft.value = value
+    const parsed = value.trim() ? jmapIncoming(value) : { host: '', port: 443, security: 'tls' as const, url: undefined }
+    if (!parsed) return
+    Object.assign(incoming.value, { host: parsed.host, port: parsed.port, security: parsed.security, url: parsed.url })
   }
 })
 </script>
 
 <template>
   <fieldset class="flex flex-col gap-2">
-    <legend class="mb-2 text-sm font-medium text-highlighted">
-      JMAP
+    <legend class="w-full flex items-center justify-between mb-2 text-sm font-medium text-highlighted">
+      Incoming mail
+      <slot />
     </legend>
     <UInput
-      v-model="url"
-      type="url"
-      placeholder="https://mail.example.com/jmap/session"
-      aria-label="JMAP session URL"
-    />
-    <USelect
-      v-model="auth"
-      :items="authItems"
-      aria-label="How to sign in"
+      v-model="text"
+      placeholder="mail.example.com"
+      aria-label="JMAP server"
     />
     <p class="text-xs text-muted text-pretty">
-      Leave the URL empty to use /.well-known/jmap on the server above. When the server can send mail itself, the Outgoing settings are only a fallback.
+      The server name, or its session URL (Fastmail: https://api.fastmail.com/jmap/session). Use your password, an app password or an API token.
     </p>
   </fieldset>
 </template>

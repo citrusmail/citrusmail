@@ -41,7 +41,7 @@ export interface IncomingSettings extends ServerSettings {
   protocol: MailProtocol
   /** JMAP: the session URL, when it isn't https://host/.well-known/jmap */
   url?: string
-  /** JMAP: 'bearer' sends the password as an API token instead of with Basic auth */
+  /** JMAP: how the password goes, found at sign-in: as a password (Basic) or an API token (Bearer) */
   auth?: 'basic' | 'bearer'
 }
 
@@ -86,10 +86,8 @@ export interface DiscoveryResult {
   appPasswordUrl?: string
   incoming?: AccountSettings['incoming']
   outgoing?: ServerSettings
-  /** A JMAP session URL the domain or its mail host answers on, offered instead of IMAP */
+  /** A JMAP session URL the domain or its mail host answers on: sign-in tries it before IMAP */
   jmap?: string
-  /** How that JMAP server takes a password: 'bearer' wants an API token */
-  jmapAuth?: 'basic' | 'bearer'
   caldav?: string
   carddav?: string
   /** Where the settings came from, e.g. 'preset', 'ispdb', 'srv', 'guess' */

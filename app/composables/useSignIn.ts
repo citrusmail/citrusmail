@@ -61,7 +61,9 @@ export function useSignIn() {
       if (value !== form.email) return
       discovery.value = result
       if (!touched.value) {
-        if (result.incoming) form.incoming = { ...result.incoming }
+        // A JMAP server goes first, as the server will try it first
+        const incoming = (result.jmap && !result.oauth ? jmapIncoming(result.jmap) : undefined) ?? result.incoming
+        if (incoming) form.incoming = { ...incoming }
         if (result.outgoing) form.outgoing = { ...result.outgoing }
         form.caldav = result.caldav ?? ''
         form.carddav = result.carddav ?? ''
@@ -74,12 +76,12 @@ export function useSignIn() {
     }
   })
 
-  /** Discovery found a JMAP server: sign in over JMAP instead of IMAP */
-  function useJmap() {
-    const url = discovery.value?.jmap
-    if (!url) return
-    const found = new URL(url)
-    form.incoming = { protocol: 'jmap', host: found.hostname, port: Number(found.port) || 443, security: 'tls', url, auth: discovery.value?.jmapAuth ?? 'basic' }
+  /** Discovery found both: switch between JMAP (the default) and IMAP */
+  function chooseJmap(jmap: boolean) {
+    const found = discovery.value
+    const incoming = jmap ? found?.jmap && jmapIncoming(found.jmap) : found?.incoming
+    if (!incoming) return
+    form.incoming = { ...incoming }
     touched.value = true
   }
 
@@ -120,5 +122,5 @@ export function useSignIn() {
     }
   }
 
-  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, useJmap }
+  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, chooseJmap }
 }

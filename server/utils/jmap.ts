@@ -169,6 +169,31 @@ export async function jmapSession(ctx: JmapContext, fresh = false): Promise<Jmap
   throw new JmapError('Too many redirects finding the JMAP session.')
 }
 
+/**
+ * Signs in without asking how: the secret as a password (Basic), then as an
+ * API token (Bearer, as Fastmail wants), and makes one call to the API URL
+ * the session names, so a broken session fails here and not later. Returns
+ * the way that worked, to be kept with the account
+ */
+export async function jmapSignIn(account: AccountSettings, fetch: typeof globalThis.fetch): Promise<{ auth: 'basic' | 'bearer', session: JmapSession }> {
+  // A token is printable ASCII; anything else can't go in a Bearer header
+  const tokenLike = /^[\x21-\x7E]+$/.test(account.password)
+  const tries = account.incoming.auth ? [account.incoming.auth] : tokenLike ? ['basic', 'bearer'] as const : ['basic'] as const
+  let failure: unknown
+  for (const auth of tries) {
+    const ctx: JmapContext = { account: { ...account, incoming: { ...account.incoming, auth } }, fetch }
+    try {
+      const session = await jmapSession(ctx, true)
+      await jmapRequest(ctx, [['Core/echo', {}, '0']])
+      return { auth, session }
+    } catch (error) {
+      failure = error
+      if (!(error instanceof JmapError && error.authenticationFailed)) throw error
+    }
+  }
+  throw failure
+}
+
 export function forgetJmapSession(account: AccountSettings) {
   sessions.delete(cacheKey(account))
 }

@@ -3,8 +3,9 @@ import {
   JMAP_CORE, JMAP_ID, JMAP_MAIL, JMAP_SUBMISSION, JmapError, fillJmapTemplate, jmapAuthHeader, jmapDownload,
   jmapFlagPatch, jmapFolderOf, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
   jmapRequest, jmapSearchFilter, jmapSession, jmapSessionUrl, jmapSetResult, jmapSummary, jmapUpload,
-  parseJmapSession, pickJmapIdentity, readJmapPage, readJmapResponses
+  jmapSignIn, parseJmapSession, pickJmapIdentity, readJmapPage, readJmapResponses
 } from '../server/utils/jmap'
+import { jmapIncoming, jmapServerText } from '../shared/utils/jmap-server'
 import type { JmapContext, JmapMailbox } from '../server/utils/jmap'
 
 /* ------------------------------------------------------------------ */
@@ -316,5 +317,64 @@ describe('emails', () => {
   it('accepts JMAP ids and nothing that could reach a URL or patch path', () => {
     expect(JMAP_ID.test('Mf8a1b2c3d4e5_-')).toBe(true)
     for (const bad of ['', 'a/b', 'a b', '1:*', '../x', 'x'.repeat(256)]) expect(JMAP_ID.test(bad)).toBe(false)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/* Sign-in: one server field, password or token                        */
+/* ------------------------------------------------------------------ */
+
+describe('sign-in', () => {
+  it('reads the one server field: a host, a URL with a port, or a session URL', () => {
+    expect(jmapIncoming('mail.example.com')).toEqual({ protocol: 'jmap', host: 'mail.example.com', port: 443, security: 'tls' })
+    expect(jmapIncoming(' http://127.0.0.1:18090/ ')).toEqual({ protocol: 'jmap', host: '127.0.0.1', port: 18090, security: 'none' })
+    expect(jmapIncoming('https://api.fastmail.com/jmap/session')).toEqual({ protocol: 'jmap', host: 'api.fastmail.com', port: 443, security: 'tls', url: 'https://api.fastmail.com/jmap/session' })
+    expect(jmapIncoming('[::1]:8443')).toEqual({ protocol: 'jmap', host: '::1', port: 8443, security: 'tls' })
+    for (const bad of ['', '   ', 'ftp://example.com', 'http://']) expect(jmapIncoming(bad)).toBeUndefined()
+  })
+
+  it('shows saved settings back as short as they can be', () => {
+    for (const text of ['mail.example.com', 'http://127.0.0.1:18090', 'mail.example.com:8443', 'https://api.fastmail.com/jmap/session', '[::1]:8443']) {
+      expect(jmapServerText(jmapIncoming(text)!)).toBe(text)
+    }
+  })
+
+  /** A server that takes `secret` as Basic or as Bearer, whichever `accepts` says */
+  function signInServer(accepts: 'basic' | 'bearer' | 'none') {
+    const tried: string[] = []
+    const fetch = (async (input: string | URL, init?: RequestInit) => {
+      const auth = new Headers(init?.headers).get('authorization') ?? ''
+      const kind = auth.startsWith('Bearer ') ? 'bearer' : 'basic'
+      if (new URL(String(input)).pathname === '/.well-known/jmap') tried.push(kind)
+      if (kind !== accepts) return new Response('', { status: 401 })
+      if (new URL(String(input)).pathname === '/.well-known/jmap') return json(SESSION)
+      return json({ methodResponses: [['Core/echo', {}, '0']], sessionState: 's1' })
+    }) as typeof globalThis.fetch
+    return { tried, fetch }
+  }
+
+  it('tries the secret as a password, then as an API token', async () => {
+    const basic = signInServer('basic')
+    expect((await jmapSignIn(account(), basic.fetch)).auth).toBe('basic')
+    expect(basic.tried).toEqual(['basic'])
+
+    const bearer = signInServer('bearer')
+    expect((await jmapSignIn(account(), bearer.fetch)).auth).toBe('bearer')
+    expect(bearer.tried).toEqual(['basic', 'bearer'])
+
+    const neither = signInServer('none')
+    const error = await jmapSignIn(account(), neither.fetch).catch(e => e)
+    expect(error.authenticationFailed).toBe(true)
+    expect(neither.tried).toEqual(['basic', 'bearer'])
+  })
+
+  it('keeps a known way, and never sends a non-ASCII password as a token', async () => {
+    const known = signInServer('bearer')
+    await jmapSignIn(account({ auth: 'bearer' }), known.fetch)
+    expect(known.tried).toEqual(['bearer'])
+
+    const unicode = signInServer('none')
+    await jmapSignIn({ ...account(), password: 'pässwörd' }, unicode.fetch).catch(() => {})
+    expect(unicode.tried).toEqual(['basic'])
   })
 })

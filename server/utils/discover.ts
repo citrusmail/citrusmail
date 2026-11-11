@@ -82,9 +82,9 @@ const PRESETS: Preset[] = [
     mx: ['messagingengine.com'],
     incoming: imap('imap.fastmail.com'),
     outgoing: smtp('smtp.fastmail.com'),
-    // JMAP at Fastmail takes an API token (Settings → Privacy & Security → API tokens), not an app password
+    // JMAP at Fastmail takes an API token, not an app password: sign-in tries
+    // JMAP first, and falls back to IMAP when an app password is typed
     jmap: 'https://api.fastmail.com/jmap/session',
-    jmapAuth: 'bearer',
     caldav: 'https://caldav.fastmail.com',
     carddav: 'https://carddav.fastmail.com'
   },

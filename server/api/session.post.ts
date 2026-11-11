@@ -54,31 +54,47 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
     ? undefined
     : await discoverAccount(body.email)
 
-  const incoming = custom ? jmapOnly(body.incoming!) : found?.incoming
-  const outgoing = custom ? body.outgoing ?? jmapOutgoing(body.incoming!) : found?.outgoing
-  if (!incoming || !outgoing) {
+  // The servers to try, in order. When discovery found a JMAP server it
+  // goes first, and IMAP (or POP3) is the fallback when it won't sign in
+  const jmap = !custom && found?.jmap && !found.oauth ? jmapIncoming(found.jmap) : undefined
+  const options: { incoming: IncomingSettings, outgoing: ServerSettings }[] = custom
+    ? [{ incoming: jmapOnly(body.incoming!), outgoing: body.outgoing ?? jmapOutgoing(body.incoming!) }]
+    : [
+        ...(jmap ? [{ incoming: jmap, outgoing: found?.outgoing ?? jmapOutgoing(jmap) }] : []),
+        ...(found?.incoming && found.outgoing ? [{ incoming: found.incoming, outgoing: found.outgoing }] : [])
+      ]
+  if (!options.length) {
     const domain = body.email.split('@')[1]
     throw createError({ status: 400, message: `We couldn't find the mail servers for ${domain}. Open Advanced and enter them.`, data: { discovery: false } })
   }
 
   const dav = (key: 'caldav' | 'carddav') => config[key] ?? (custom && body[key] !== undefined ? body[key] || undefined : found?.[key])
-  const account: AccountSettings = JSON.parse(JSON.stringify({
+  const base = {
     email: body.email,
     name: body.name || undefined,
     username: body.username || found?.username,
     password: body.password,
-    incoming,
-    outgoing,
     caldav: dav('caldav'),
     carddav: dav('carddav')
-  }))
+  }
 
   // A provider that takes no password says so before the servers are even tried
   if (found?.oauth && !custom) {
     throw createError({ status: 400, message: found.oauthReady ? 'This mailbox signs in with Microsoft. Use the Sign in with Microsoft button.' : 'Microsoft no longer accepts passwords from mail apps, and this copy isn’t set up for Sign in with Microsoft yet. Whoever runs it needs to add a Microsoft app id (see the README).', data: { auth: true } })
   }
 
-  await verifyAccount(account)
+  let account: AccountSettings | undefined
+  let failure: unknown
+  for (const option of options) {
+    try {
+      account = await verifyAccount(JSON.parse(JSON.stringify({ ...base, ...option })))
+      break
+    } catch (error) {
+      failure = error
+    }
+  }
+  // Every option failed: the last one's error (IMAP's, when JMAP went first) says why
+  if (!account) throw failure
 
   // Adding a mailbox keeps the others; signing in to one already here refreshes it
   const existing = body.add ? await sessionAccounts(event) : []

@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// Discovery found a JMAP server for this address: offer it instead of IMAP
+// Discovery found a JMAP server: sign-in uses it, with IMAP one click away
 defineProps<{
   active: boolean
-  /** The server wants an API token rather than a password */
-  token?: boolean
+  /** The address has IMAP or POP3 too */
+  canSwitch: boolean
 }>()
 
 const emit = defineEmits<{
-  use: []
+  choose: [jmap: boolean]
 }>()
 </script>
 
@@ -18,19 +18,15 @@ const emit = defineEmits<{
       class="size-3.5"
       :class="active ? 'text-success' : ''"
     />
-    <template v-if="active">
-      Signing in over JMAP{{ token ? ' with an API token, in place of the password' : '' }}.
-    </template>
-    <template v-else>
-      This server also speaks JMAP.
-      <UButton
-        label="Use JMAP"
-        variant="link"
-        color="neutral"
-        size="xs"
-        class="p-0 underline"
-        @click="emit('use')"
-      />
-    </template>
+    {{ active ? 'Signing in over JMAP.' : 'This server also speaks JMAP.' }}
+    <UButton
+      v-if="!active || canSwitch"
+      :label="active ? 'Use IMAP instead' : 'Use JMAP'"
+      variant="link"
+      color="neutral"
+      size="xs"
+      class="p-0 underline"
+      @click="emit('choose', !active)"
+    />
   </p>
 </template>

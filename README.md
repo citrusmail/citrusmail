@@ -31,7 +31,7 @@ There is nothing to configure. Type your address, and CitrusMail finds the serve
 3. DNS SRV records (RFC 6186 for mail, RFC 6764 for CalDAV and CardDAV)
 4. Common hostnames such as `imap.example.com`, probed before they are used
 
-When the domain or its mail host also answers on `/.well-known/jmap`, the sign-in page offers JMAP instead (see [JMAP](#jmap)).
+When the domain or its mail host also answers on `/.well-known/jmap`, CitrusMail signs in over JMAP, and falls back to IMAP if that doesn't work (see [JMAP](#jmap)).
 
 If a provider needs an app password, the sign-in page says so and links to the page where you create one. Every setting can also be entered by hand under **Server settings**.
 
@@ -74,11 +74,11 @@ The sign-in page then shows **Sign in with Microsoft** for those addresses. The 
 
 ## JMAP
 
-[JMAP](https://jmap.io) (RFC 8620 and RFC 8621) is a newer mail protocol over HTTPS and JSON. Choose **JMAP** under **Server settings → Incoming**, or take the sign-in page's offer when it finds a JMAP server for your address.
+[JMAP](https://jmap.io) (RFC 8620 and RFC 8621) is a newer mail protocol over HTTPS and JSON. When CitrusMail finds a JMAP server for your address (at `/.well-known/jmap` on the domain or its mail host, or a `_jmap._tcp` SRV record), it signs in over JMAP with just your email and password, and falls back to IMAP if JMAP doesn't take them. The sign-in page says so, with a link to use IMAP instead.
 
-- **Server**: enter the host, and CitrusMail looks for the session at `https://host/.well-known/jmap`, or paste the session URL itself (Fastmail: `https://api.fastmail.com/jmap/session`). A redirect is only followed on the same host, so the password never goes anywhere else.
-- **Sign-in**: your password or an app password (sent with Basic auth), or an API token (sent as a Bearer token). Fastmail's JMAP takes an API token, made under Settings → Privacy & Security → Manage API tokens.
-- **Sending**: when the server offers JMAP submission, mail goes out through it (EmailSubmission) and lands in Sent on its own, so no SMTP settings are needed. Otherwise CitrusMail sends over the SMTP server under **Outgoing** and files a copy in Sent.
+- **Entering it yourself**: choose **JMAP** under **Server settings → Incoming** and type the server in one field: a name (`mail.example.com`, which means `https://mail.example.com/.well-known/jmap`), a URL with a port (`http://127.0.0.1:8080`) or the session URL itself (Fastmail: `https://api.fastmail.com/jmap/session`). A redirect is only followed on the same host, so the password never goes anywhere else.
+- **Password or token**: type your password, an app password or an API token. CitrusMail tries it as a password (Basic auth), then as a token (Bearer), and remembers which worked. Fastmail's JMAP takes an API token, made under Settings → Privacy & Security → Manage API tokens. With an app password, Fastmail signs in over IMAP instead.
+- **Sending**: when the server offers JMAP submission, mail goes out through it (EmailSubmission) and lands in Sent on its own, so SMTP settings are optional. Otherwise CitrusMail sends over the SMTP server under **Outgoing** and files a copy in Sent.
 - **What works**: folders (create, rename, delete), the message list with search and filters, reading, attachments, the original message, read and flagged, move, delete (to Trash, or for good from Trash), drafts, AI search and new-mail notifications.
 - **Not yet over JMAP**: sender allow and block lists, rules, settings sync, the subscriptions page and read receipts collection. These still need IMAP. Push uses the minute-by-minute check, not JMAP push.
 
