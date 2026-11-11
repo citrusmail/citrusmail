@@ -28,6 +28,10 @@ export default defineNuxtConfig({
   // email and password, and the UI hides the Advanced panel
   runtimeConfig: {
     session: {
+      // Its own name: a browser shares cookies across ports, so another Nuxt
+      // app on localhost would otherwise overwrite it and sign you out.
+      // NUXT_SESSION_NAME renames it, e.g. for two instances on one host
+      name: 'citrusmail-session',
       // The cookie holds the mail password and can't be revoked server-side,
       // so it lasts a week rather than a month
       maxAge: 60 * 60 * 24 * 7
