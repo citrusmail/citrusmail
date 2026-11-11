@@ -2,7 +2,8 @@
 // runs inside this process on a local port, and one window shows it. Mail
 // passwords still live only in the sealed session cookie, now in this app's
 // own browser profile, and settings land in the app's data folder
-import { app, BrowserWindow, ipcMain, nativeTheme, Notification, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell } from 'electron'
+import updater from 'electron-updater'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -243,6 +244,42 @@ function lockDownSession() {
   })
 }
 
+// Updates: the app looks at the release feed (`publish` in
+// electron-builder.config.cjs) on launch and every few hours, downloads a
+// newer version quietly, and asks once it is ready. Only a signed build can
+// update itself on a Mac, so an ad-hoc build just logs and carries on
+const { autoUpdater } = updater
+const CHECK_EVERY = 4 * 60 * 60 * 1000
+let updateAsked = false
+
+function startUpdates() {
+  if (!app.isPackaged) return
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.logger = null
+  autoUpdater.on('error', error => console.warn('Update check failed:', String(error?.message ?? error).split('\n')[0]))
+  autoUpdater.on('update-downloaded', async ({ version }) => {
+    if (updateAsked) return
+    updateAsked = true
+    const { response } = await dialog.showMessageBox(win ?? undefined, {
+      type: 'info',
+      message: `${appName} ${version} is ready`,
+      detail: 'Restart to finish installing it. Otherwise it installs the next time you quit.',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    if (response === 0) {
+      quitting = true
+      autoUpdater.quitAndInstall()
+    }
+  })
+  const check = () => autoUpdater.checkForUpdates().catch(() => {})
+  // A moment after launch, so the window comes first
+  setTimeout(check, 15_000)
+  setInterval(check, CHECK_EVERY)
+}
+
 app.on('web-contents-created', (_event, contents) => {
   // No <webview>, ever
   contents.on('will-attach-webview', event => event.preventDefault())
@@ -252,4 +289,5 @@ app.whenReady().then(async () => {
   origin = await startServer()
   lockDownSession()
   openWindow()
+  startUpdates()
 })

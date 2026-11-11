@@ -15,10 +15,17 @@ const appId = desktop.appId || 'app.citrusmail.desktop'
 if (!/^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/i.test(appId)) throw new Error(`desktop.json appId "${appId}" is not a reverse-domain id like com.example.mail`)
 const icon = existsSync(join(brandDir, 'icon.png')) ? join(brandDir, 'icon.png') : 'build/icon.png'
 
+// Where installed apps look for updates (electron-updater reads the yml files
+// published next to the installers). CitrusMail's own releases live on GitHub;
+// a brand sets `updates` in desktop.json to publish its own, e.g.
+// {"provider": "generic", "url": "https://downloads.acme.com/mail"}
+const publish = desktop.updates || { provider: 'github', owner: 'citrusmail', repo: 'citrusmail' }
+
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
   productName,
+  publish,
   // Keep in step with the electron devDependency
   electronVersion: '45.2.1',
   copyright: desktop.copyright || 'Copyright © 2026 CitrusMail contributors',
