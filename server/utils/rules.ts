@@ -1,5 +1,6 @@
-import type { SearchObject } from 'imapflow'
+import type { FetchMessageObject, SearchObject } from 'imapflow'
 import { accountKey, inBackground, withImap, withMailbox } from './imap'
+import { moveOnce } from './move-once'
 
 function criteriaFor(rule: MailRule, validity: string): SearchObject | undefined {
   const parts: SearchObject[] = rule.conditions
@@ -101,20 +102,10 @@ function parentsOf(rule: MailRule, rules: MailRule[]) {
     .filter(folder => folder !== rule.folder && /^[/.]/.test(rule.folder.slice(folder.length)) && rule.folder.startsWith(folder)))]
 }
 
-async function fileFrom(account: AccountSettings, source: string, rule: MailRule, criteria: SearchObject, from?: number) {
-  return withMailbox(account, source, async (client) => {
-    let uids = await client.search(criteria, { uid: true }).catch(() => false)
-    if (!Array.isArray(uids) || !uids.length) return 0
-    if (from !== undefined) {
-      const arrived = await client.fetchAll(uids.join(','), { uid: true, internalDate: true }, { uid: true })
-      const keep = new Set(arrived.filter(msg => new Date(msg.internalDate ?? 0).getTime() >= from).map(msg => msg.uid))
-      uids = uids.filter(uid => keep.has(uid))
-      if (!uids.length) return 0
-    }
-    const range = uids.join(',')
-    if (rule.markRead) await client.messageFlagsAdd(range, ['\\Seen'], { uid: true })
-    return await client.messageMove(range, rule.folder, { uid: true }).catch(() => false) ? uids.length : 0
-  })
+/** Each message is filed once: a server that leaves the original behind doesn't get it copied again every check */
+function fileFrom(account: AccountSettings, source: string, rule: MailRule, criteria: SearchObject, from?: number) {
+  const keep = from === undefined ? undefined : (msg: FetchMessageObject) => new Date(msg.internalDate ?? 0).getTime() >= from
+  return moveOnce(account, { from: source, to: rule.folder, criteria, keep, markRead: rule.markRead })
 }
 
 async function runFolderRules(account: AccountSettings): Promise<number> {

@@ -1,6 +1,6 @@
 import {
-  JMAP_CONTENT_TYPE, JMAP_RULE_MARK, JMAP_SYNC_FOLDER, findJmapRole, isJmapReport, isJmapSyncFolder, jmapFlagPatch, jmapFromFilter,
-  jmapMovePatch, jmapRequest, jmapRuleFilter, jmapSetResult
+  JMAP_CONTENT_TYPE, JMAP_RULE_MARK, findJmapRole, isJmapReport, isJmapSyncFolder, jmapFlagPatch, jmapFromFilter,
+  jmapMovePatch, jmapRequest, jmapRuleFilter
 } from './jmap'
 import type { JmapContext, JmapEmail, JmapMailbox } from './jmap'
 import { jmapOps } from './mail-jmap'
@@ -158,28 +158,18 @@ export async function jmapMarkRead(account: AccountSettings, ids: string[]): Pro
 /* Settings in the mailbox (sync.ts)                                   */
 /* ------------------------------------------------------------------ */
 
-/** The newest settings message, or undefined when there's none yet */
-export async function jmapReadSettings(account: AccountSettings): Promise<Buffer | undefined> {
+/**
+ * Removes the retired settings folder (sync.ts), only when every message in
+ * it is one CitrusMail wrote. True when it's gone (or never was)
+ */
+export async function jmapRetireSettingsFolder(account: AccountSettings, ownSubject: RegExp): Promise<boolean> {
   const ctx = ops().context(account)
   const folder = (await ops().mailboxes(ctx)).find(isJmapSyncFolder)
-  if (!folder) return undefined
-  const [newest] = await find(ctx, { inMailbox: folder.id }, ['id', 'blobId', 'size'], 1)
-  return newest ? ops().source(ctx, newest) : undefined
-}
-
-/** Saves a new settings message and removes the older ones; the folder is made unsubscribed, so other apps hide it */
-export async function jmapWriteSettings(account: AccountSettings, raw: Buffer): Promise<void> {
-  const ctx = ops().context(account)
-  let folder = (await ops().mailboxes(ctx)).find(isJmapSyncFolder)
-  if (!folder) {
-    const create = (extra: object) => ops().call(ctx, 'Mailbox/set', { create: { new: { name: JMAP_SYNC_FOLDER, parentId: null, ...extra } } })
-      .then(result => String(jmapSetResult(result, 'created', 'new').id))
-    const id = await create({ isSubscribed: false }).catch(() => create({}))
-    folder = { id, name: JMAP_SYNC_FOLDER }
-  }
-  const id = await ops().importEmail(ctx, raw, folder.id, { $seen: true })
-  const older = (await find(ctx, { inMailbox: folder.id }, ['id'], 50)).filter(email => email.id !== id)
-  if (older.length) await ops().call(ctx, 'Email/set', { destroy: older.map(email => email.id) })
+  if (!folder) return true
+  const emails = await find(ctx, { inMailbox: folder.id }, ['id', 'subject'], 500)
+  if (!emails.every(email => ownSubject.test(String(email.subject ?? '')))) return false
+  await ops().call(ctx, 'Mailbox/set', { destroy: [folder.id], onDestroyRemoveEmails: true })
+  return true
 }
 
 /* ------------------------------------------------------------------ */

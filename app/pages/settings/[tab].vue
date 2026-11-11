@@ -4,7 +4,7 @@ const route = useRoute()
 const TABS = {
   profile: { title: 'Profile', description: 'How you appear to the people you write to.' },
   signature: { title: 'Signature', description: 'Added under the messages you write.' },
-  appearance: { title: 'Appearance', description: 'How CitrusMail looks for you, on every device you sign in on.' },
+  appearance: { title: 'Appearance', description: 'How CitrusMail looks for you.' },
   reading: { title: 'Reading', description: 'How messages open, and when pictures from the web load in them.' },
   notifications: { title: 'Notifications', description: 'When and how CitrusMail tells you about new mail.' },
   senders: { title: 'Senders', description: 'People and domains that always reach your Inbox, and those that never do.' },

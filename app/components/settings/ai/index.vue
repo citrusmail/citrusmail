@@ -18,7 +18,7 @@ const { status, saving, saveKey, use, remove } = useAiKeys()
     </ul>
 
     <p class="text-sm text-muted max-w-prose text-pretty">
-      Keys are encrypted on this server and synced through your mailbox, locked with your mail password.
+      Keys are encrypted and stay on this server.
       When you use an AI feature, the message it needs goes straight from here to the provider you chose, under their terms. Nothing is sent until you ask.
     </p>
   </div>
