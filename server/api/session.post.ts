@@ -17,13 +17,25 @@ const bodySchema = z.object({
   password: z.string().min(1, 'Password is required').max(1024).refine(noControl),
   name: z.string().trim().max(100).refine(noControl).optional(),
   username: z.string().trim().max(254).refine(noControl).optional(),
-  incoming: server.extend({ protocol: z.enum(['imap', 'pop3']) }).optional(),
+  incoming: server.extend({
+    protocol: z.enum(['imap', 'pop3', 'jmap']),
+    /** JMAP: a session URL, when it isn't at /.well-known/jmap on the host */
+    url: z.url({ protocol: /^https?$/ }).max(1000).optional(),
+    auth: z.enum(['basic', 'bearer']).optional()
+  }).optional(),
   outgoing: server.optional(),
   caldav: davUrl,
   carddav: davUrl,
   /** Add this mailbox next to the ones already signed in, instead of replacing them */
   add: z.boolean().optional()
 })
+
+/** The JMAP-only fields are dropped from IMAP and POP3 settings */
+function jmapOnly(incoming: IncomingSettings): IncomingSettings {
+  if (incoming.protocol === 'jmap') return incoming
+  const { url: _url, auth: _auth, ...rest } = incoming
+  return rest
+}
 
 export default defineEventHandler(async (event): Promise<SessionAccount> => {
   rateLimit(event, 'login', 10)
@@ -36,13 +48,14 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
   const config = mailConfig()
   // With allowed domains set, those domains' own servers are the only ones:
   // a hand-entered server would let anyone "sign in" as user@company.com
-  const custom = !config.locked && !config.allowedDomains.length && body.incoming && body.outgoing
+  // JMAP can do without SMTP settings: the server usually sends mail itself
+  const custom = !config.locked && !config.allowedDomains.length && body.incoming && (body.outgoing || body.incoming.protocol === 'jmap')
   const found = custom && body.caldav !== undefined && body.carddav !== undefined
     ? undefined
     : await discoverAccount(body.email)
 
-  const incoming = custom ? body.incoming : found?.incoming
-  const outgoing = custom ? body.outgoing : found?.outgoing
+  const incoming = custom ? jmapOnly(body.incoming!) : found?.incoming
+  const outgoing = custom ? body.outgoing ?? jmapOutgoing(body.incoming!) : found?.outgoing
   if (!incoming || !outgoing) {
     const domain = body.email.split('@')[1]
     throw createError({ status: 400, message: `We couldn't find the mail servers for ${domain}. Open Advanced and enter them.`, data: { discovery: false } })

@@ -26,11 +26,6 @@ const TABS = [
 ]
 const tab = ref('incoming')
 
-const protocols = [
-  { label: 'IMAP', value: 'imap' },
-  { label: 'POP3', value: 'pop3' }
-]
-
 useServerPorts(form)
 </script>
 
@@ -58,20 +53,10 @@ useServerPorts(form)
         </template>
 
         <template #incoming>
-          <AuthServerFields
-            v-model:server="form.incoming"
-            title="Incoming mail"
+          <AuthIncomingFields
+            v-model:incoming="form.incoming"
             :security-items="securityItems"
-          >
-            <UTabs
-              v-model="form.incoming.protocol"
-              :items="protocols"
-              :content="false"
-              color="neutral"
-              size="xs"
-              class="w-32"
-            />
-          </AuthServerFields>
+          />
         </template>
 
         <template #outgoing>

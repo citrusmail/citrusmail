@@ -35,6 +35,16 @@ export interface ServerSettings {
   security: Security
 }
 
+export type MailProtocol = 'imap' | 'pop3' | 'jmap'
+
+export interface IncomingSettings extends ServerSettings {
+  protocol: MailProtocol
+  /** JMAP: the session URL, when it isn't https://host/.well-known/jmap */
+  url?: string
+  /** JMAP: 'bearer' sends the password as an API token instead of with Basic auth */
+  auth?: 'basic' | 'bearer'
+}
+
 /** Everything needed to reach one account. Lives only in the sealed session cookie. */
 export interface AccountSettings {
   email: string
@@ -45,7 +55,8 @@ export interface AccountSettings {
   password: string
   /** Set when the provider only takes OAuth (Microsoft 365, Outlook.com): the tokens, kept fresh by requireAccount() */
   oauth?: OAuthTokens
-  incoming: ServerSettings & { protocol: 'imap' | 'pop3' }
+  incoming: IncomingSettings
+  /** With JMAP, only used when the JMAP server can't send mail itself */
   outgoing: ServerSettings
   /** CalDAV / CardDAV root, e.g. https://dav.example.com. Empty = feature off */
   caldav?: string
@@ -75,6 +86,10 @@ export interface DiscoveryResult {
   appPasswordUrl?: string
   incoming?: AccountSettings['incoming']
   outgoing?: ServerSettings
+  /** A JMAP session URL the domain or its mail host answers on, offered instead of IMAP */
+  jmap?: string
+  /** How that JMAP server takes a password: 'bearer' wants an API token */
+  jmapAuth?: 'basic' | 'bearer'
   caldav?: string
   carddav?: string
   /** Where the settings came from, e.g. 'preset', 'ispdb', 'srv', 'guess' */
@@ -89,7 +104,7 @@ export interface DiscoveryResult {
 export interface SessionAccount {
   email: string
   name?: string
-  protocol: 'imap' | 'pop3'
+  protocol: MailProtocol
   hasCalendar: boolean
   hasContacts: boolean
   /** Every mailbox signed in on this browser, the open one first */
@@ -109,7 +124,7 @@ export interface MailboxSummary {
 export type FolderRole = 'inbox' | 'drafts' | 'sent' | 'junk' | 'trash' | 'archive' | 'flagged'
 
 export interface Folder {
-  /** Full IMAP path, used as the id in URLs (encodeURIComponent) */
+  /** Full IMAP path (JMAP: the mailbox id, INBOX for the Inbox), used as the id in URLs (encodeURIComponent) */
   path: string
   name: string
   role?: FolderRole
@@ -124,7 +139,7 @@ export interface Address {
 }
 
 export interface MessageSummary {
-  /** IMAP UID, or POP3 UIDL */
+  /** IMAP UID, POP3 UIDL, or JMAP email id */
   id: string
   folder: string
   subject: string

@@ -22,7 +22,7 @@ export default defineNuxtConfig({
     }
   },
 
-  // Every mail setting is optional. Set NUXT_MAIL_IMAP_HOST (or POP3) and
+  // Every mail setting is optional. Set NUXT_MAIL_IMAP_HOST (or POP3, or JMAP) and
   // NUXT_MAIL_SMTP_HOST to pin a company's servers: users then only type an
   // email and password, and the UI hides the Advanced panel
   runtimeConfig: {
@@ -44,6 +44,8 @@ export default defineNuxtConfig({
     mail: {
       imap: { host: '', port: 0, security: '' },
       pop3: { host: '', port: 0, security: '' },
+      // NUXT_MAIL_JMAP_URL (a session URL), or NUXT_MAIL_JMAP_HOST / _PORT / _SECURITY
+      jmap: { host: '', port: 0, security: '', url: '' },
       smtp: { host: '', port: 0, security: '' },
       caldavUrl: '',
       carddavUrl: '',

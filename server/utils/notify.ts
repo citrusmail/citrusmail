@@ -38,6 +38,7 @@ export function checkNewMail(account: AccountSettings, folders: string[], cursor
 
 async function checkNow(account: AccountSettings, folders: string[], cursors: Cursors): Promise<NewMail> {
   if (account.incoming.protocol === 'pop3') return checkPop3(account, cursors)
+  if (account.incoming.protocol === 'jmap') return checkJmap(account, folders, cursors)
   const result: NewMail = { cursors: {}, messages: [] }
   // Reports for messages you tracked are marked read first, so they show as
   // a badge on the sent message instead of ringing as new mail
@@ -63,6 +64,24 @@ async function checkPop3(account: AccountSettings, cursors: Cursors): Promise<Ne
   const since = cursors.INBOX
   const messages = since === undefined ? [] : page.messages.filter(msg => (Date.parse(msg.date) || 0) > since).slice(0, PER_FOLDER)
   return { cursors: { INBOX: Math.max(newest, since ?? 0) }, messages }
+}
+
+/** JMAP ids don't grow either: the newest unread message's time stands in, per folder */
+async function checkJmap(account: AccountSettings, folders: string[], cursors: Cursors): Promise<NewMail> {
+  const result: NewMail = { cursors: {}, messages: [] }
+  const mail = mailFor(account)
+  for (const path of folders) {
+    try {
+      const page = await mail.listMessages(path, { unread: true })
+      const since = cursors[path]
+      const newest = page.messages.reduce((max, msg) => Math.max(max, Date.parse(msg.date) || 0), 0)
+      result.cursors[path] = Math.max(newest, since ?? 0)
+      if (since !== undefined) result.messages.push(...page.messages.filter(msg => (Date.parse(msg.date) || 0) > since).slice(0, PER_FOLDER))
+    } catch {
+      // A folder that was renamed or deleted drops out quietly
+    }
+  }
+  return result
 }
 
 /** The folders a mailbox notifies for, from Settings → Notifications */

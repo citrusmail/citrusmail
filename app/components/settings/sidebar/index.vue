@@ -8,7 +8,8 @@ defineProps<{
 const { account } = useShell()
 const appConfig = useAppConfig()
 
-const imap = computed(() => account.value?.protocol !== 'pop3')
+// Sender lists and rules work on the IMAP connection
+const imap = computed(() => account.value?.protocol === 'imap')
 
 const items = computed<NavigationMenuItem[]>(() => [
   { label: 'Profile', icon: 'i-lucide-circle-user-round', to: '/settings/profile' },
@@ -16,7 +17,7 @@ const items = computed<NavigationMenuItem[]>(() => [
   ...(appConfig.citrusmail.allowAppearance ? [{ label: 'Appearance', icon: 'i-lucide-palette', to: '/settings/appearance' }] : []),
   { label: 'Reading', icon: 'i-lucide-book-open', to: '/settings/reading' },
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/settings/notifications' },
-  // POP3 has no folders to file into
+  // POP3 has no folders to file into, and JMAP mailboxes don't run them yet
   ...(imap.value ? [{ label: 'Senders', icon: 'i-lucide-shield-check', to: '/settings/senders' }] : []),
   ...(imap.value ? [{ label: 'Rules', icon: 'i-lucide-list-filter', to: '/settings/rules' }] : []),
   { label: 'Tracking', icon: 'i-lucide-mail-check', to: '/settings/tracking' },

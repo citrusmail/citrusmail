@@ -74,6 +74,15 @@ export function useSignIn() {
     }
   })
 
+  /** Discovery found a JMAP server: sign in over JMAP instead of IMAP */
+  function useJmap() {
+    const url = discovery.value?.jmap
+    if (!url) return
+    const found = new URL(url)
+    form.incoming = { protocol: 'jmap', host: found.hostname, port: Number(found.port) || 443, security: 'tls', url, auth: discovery.value?.jmapAuth ?? 'basic' }
+    touched.value = true
+  }
+
   async function submit() {
     error.value = ''
     submitting.value = true
@@ -111,5 +120,5 @@ export function useSignIn() {
     }
   }
 
-  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl }
+  return { form, adding, locked, discovery, discovering, advancedOpen, touched, error, submitting, submit, oauth, oauthUrl, useJmap }
 }

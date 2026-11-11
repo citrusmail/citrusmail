@@ -2,7 +2,7 @@
 
 An open-source mail, calendar and contacts client for any provider, built with [Nuxt 4](https://nuxt.com) and [Nuxt UI 4](https://ui.nuxt.com).
 
-- **Mail** over IMAP or POP3, sending over SMTP
+- **Mail** over IMAP, POP3 or [JMAP](#jmap), sending over SMTP (or through the JMAP server)
 - **Calendar** over CalDAV, using the [Nuxt UI calendar template](https://github.com/nuxt-ui-templates/calendar): day, week, month and year views, drag and drop, and quick events
 - **Contacts** over CardDAV
 - **Composer** built on the Nuxt UI `UEditor`, adapted from the [editor template](https://github.com/nuxt-ui-templates/editor), with send later
@@ -31,6 +31,8 @@ There is nothing to configure. Type your address, and CitrusMail finds the serve
 3. DNS SRV records (RFC 6186 for mail, RFC 6764 for CalDAV and CardDAV)
 4. Common hostnames such as `imap.example.com`, probed before they are used
 
+When the domain or its mail host also answers on `/.well-known/jmap`, the sign-in page offers JMAP instead (see [JMAP](#jmap)).
+
 If a provider needs an app password, the sign-in page says so and links to the page where you create one. Every setting can also be entered by hand under **Server settings**.
 
 There is no database. The account settings, including the password, are stored in an encrypted, HTTP-only session cookie in your browser. Nothing is stored on the server.
@@ -41,6 +43,8 @@ There is no database. The account settings, including the password, are stored i
 pnpm install
 pnpm dev
 ```
+
+`pnpm test` runs the unit tests (vitest), `pnpm lint` and `pnpm typecheck` the checks CI runs.
 
 In production, set a secret for sealing sessions:
 
@@ -68,6 +72,20 @@ NUXT_OAUTH_MICROSOFT_TENANT=common    # or your tenant id to allow one organizat
 
 The sign-in page then shows **Sign in with Microsoft** for those addresses. The tokens live in the same encrypted cookie a password would, and are renewed on their own; after 90 days without use Microsoft asks to sign in again. Microsoft offers no CalDAV or CardDAV, so those mailboxes are mail only. In the desktop app, put the client id in the brand folder's `app.env`.
 
+## JMAP
+
+[JMAP](https://jmap.io) (RFC 8620 and RFC 8621) is a newer mail protocol over HTTPS and JSON. Choose **JMAP** under **Server settings → Incoming**, or take the sign-in page's offer when it finds a JMAP server for your address.
+
+- **Server**: enter the host, and CitrusMail looks for the session at `https://host/.well-known/jmap`, or paste the session URL itself (Fastmail: `https://api.fastmail.com/jmap/session`). A redirect is only followed on the same host, so the password never goes anywhere else.
+- **Sign-in**: your password or an app password (sent with Basic auth), or an API token (sent as a Bearer token). Fastmail's JMAP takes an API token, made under Settings → Privacy & Security → Manage API tokens.
+- **Sending**: when the server offers JMAP submission, mail goes out through it (EmailSubmission) and lands in Sent on its own, so no SMTP settings are needed. Otherwise CitrusMail sends over the SMTP server under **Outgoing** and files a copy in Sent.
+- **What works**: folders (create, rename, delete), the message list with search and filters, reading, attachments, the original message, read and flagged, move, delete (to Trash, or for good from Trash), drafts, AI search and new-mail notifications.
+- **Not yet over JMAP**: sender allow and block lists, rules, settings sync, the subscriptions page and read receipts collection. These still need IMAP. Push uses the minute-by-minute check, not JMAP push.
+
+Tested against [Stalwart](https://stalw.art) 1.1. It is written to the RFCs and should work with [Fastmail](https://www.fastmail.com) and [Cyrus IMAP](https://www.cyrusimap.org) 3.x, but they haven't been tested yet: reports are welcome.
+
+To pin a JMAP server for everyone, set `NUXT_MAIL_JMAP_URL` (or `NUXT_MAIL_JMAP_HOST`), below.
+
 ## Lock it to your company's servers (optional)
 
 Set these variables and people only enter an email and a password: the server settings, the connection card on the sign-in page and the calendar and contacts server fields are all hidden. They are read when the server starts, so no rebuild is needed.
@@ -76,12 +94,13 @@ Set these variables and people only enter an email and a password: the server se
 | --- | --- |
 | `NUXT_MAIL_IMAP_HOST` / `_PORT` / `_SECURITY` | `imap.example.com` / `993` / `tls` |
 | `NUXT_MAIL_POP3_HOST` / `_PORT` / `_SECURITY` | use instead of IMAP |
+| `NUXT_MAIL_JMAP_URL`, or `NUXT_MAIL_JMAP_HOST` / `_PORT` / `_SECURITY` | `https://mail.example.com/.well-known/jmap`, use instead of IMAP. SMTP is then optional: it's only used if the server can't send |
 | `NUXT_MAIL_SMTP_HOST` / `_PORT` / `_SECURITY` | `smtp.example.com` / `465` / `tls` |
 | `NUXT_MAIL_CALDAV_URL` | `https://dav.example.com` |
 | `NUXT_MAIL_CARDDAV_URL` | `https://dav.example.com` |
 | `NUXT_MAIL_ALLOWED_DOMAINS` | `example.com,example.org` |
 
-`SECURITY` is `tls`, `starttls` or `none`. With `NUXT_MAIL_ALLOWED_DOMAINS` set, those domains' own servers are the only ones people can sign in to.
+`SECURITY` is `tls`, `starttls` or `none` (for JMAP, `tls` is https and `none` is http). With `NUXT_MAIL_ALLOWED_DOMAINS` set, those domains' own servers are the only ones people can sign in to.
 
 ### Other settings
 

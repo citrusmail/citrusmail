@@ -85,8 +85,11 @@ export function composeMessage(account: AccountSettings, message: OutgoingMessag
   return node
 }
 
-/** Sends over the account's SMTP server and returns the raw message, for the Sent folder */
-export async function sendMail(account: AccountSettings, message: OutgoingMessage): Promise<{ messageId: string, raw: Buffer }> {
+/** Hands a built message to something other than SMTP (a JMAP server); `sentCopy` is the one for Sent */
+export type Deliver = (raw: Buffer, envelope: { from: string, to: string[] }, sentCopy: Buffer) => Promise<void>
+
+/** Sends over the account's SMTP server, or `deliver`, and returns the raw message, for the Sent folder */
+export async function sendMail(account: AccountSettings, message: OutgoingMessage, deliver?: Deliver): Promise<{ messageId: string, raw: Buffer }> {
   const domain = account.email.split('@')[1] || 'citrusmail.local'
   const messageId = `<${randomUUID()}@${domain}>`
   const date = new Date()
@@ -106,6 +109,12 @@ export async function sendMail(account: AccountSettings, message: OutgoingMessag
   // Bcc is left out of the built message but kept in the envelope
   const envelope = node.getEnvelope()
   const raw = await node.build()
+  if (deliver) {
+    const copy = pixel ? await sentCopy.build() : raw
+    await deliver(raw, { from: account.email, to: envelope.to }, copy)
+    if (pixel) await markTracked(account, messageId).catch(() => {})
+    return { messageId, raw: copy }
+  }
   const transporter = await transport(account)
   try {
     await transporter.sendMail({

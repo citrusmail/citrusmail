@@ -100,6 +100,8 @@ export function listSubscriptions(account: AccountSettings, scan = 800): Promise
 }
 
 async function scanSubscriptions(account: AccountSettings, scan: number): Promise<Subscription[]> {
+  // Reads IMAP headers in bulk; the page is only offered for IMAP mailboxes
+  if (account.incoming.protocol !== 'imap') return []
   const unsubscribed = await readLocal<Record<string, string>>(account, 'unsubscribed') ?? {}
   const found = await withMailbox(account, 'INBOX', async (client) => {
     const exists = client.mailbox ? client.mailbox.exists : 0
