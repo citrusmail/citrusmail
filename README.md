@@ -22,6 +22,12 @@ An open-source mail, calendar and contacts client for any provider, built with [
 
 Set a mail server in the environment and every server option disappears from the app: the sign-in page asks only for an email and a password, and Settings has no server fields.
 
+## Need mailboxes to go with it?
+
+CitrusMail is only the client. It works with any IMAP, POP3 or JMAP server, so you can keep the mail host you already have.
+
+If you are building a mail app for your own clients and don't have a mail host yet, [Faivelo](https://faivelo.com) (who make CitrusMail) host mail on your clients' domains. The [partner tier](https://faivelo.com/partners) is priced per domain, from $3 a month, with unlimited mailboxes on each one. It includes IMAP, SMTP and JMAP, webmail and setup emails in your brand, and an API to create customers, domains and mailboxes from code. Then set the server variables [below](#lock-it-to-your-companys-servers-optional) so your app only asks for an email and a password.
+
 ## Sign in with an email and a password
 
 There is nothing to configure. Type your address, and CitrusMail finds the servers in this order:
