@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
   const remaining = occurrence ? excludeOccurrence(found.object.data, occurrence, viewerZone(event)) : null
   if (remaining) {
-    await putObject(dav, found.object.url, remaining, found.object.etag)
+    await putObject(dav, found.object.url, remaining, found.object.etag, true)
   } else {
     await deleteObject(dav, found.object.url, found.object.etag)
   }

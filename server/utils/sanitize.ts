@@ -100,7 +100,8 @@ export function htmlToText(html: string): string {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, '\'')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    // Past the last code point fromCodePoint throws, and one message would take the whole list down
+    .replace(/&#(\d+);/g, (_, n) => Number(n) <= 0x10FFFF ? String.fromCodePoint(Number(n)) : '')
     // Line by line: a regex over the whole text is quadratic on long runs of spaces
     .split('\n').map(line => line.trimEnd()).join('\n')
     .replace(/\n{3,}/g, '\n\n')

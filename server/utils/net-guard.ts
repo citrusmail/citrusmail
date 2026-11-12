@@ -113,9 +113,11 @@ export function guardedFetch(allowPrivate = privateHostsAllowed(), timeout = 20_
     const redirect = init?.redirect ?? 'follow'
     // Follow redirects by hand so a literal private IP in a Location is caught too
     let current = url
+    let headers = init?.headers
     for (let hop = 0; hop < 5; hop++) {
       const res = await undiciFetch(current, {
         ...(init as object),
+        headers,
         redirect: 'manual',
         dispatcher: agentFor(allowPrivate),
         signal: init?.signal ?? AbortSignal.timeout(timeout)
@@ -126,7 +128,16 @@ export function guardedFetch(allowPrivate = privateHostsAllowed(), timeout = 20_
         return res as unknown as Response
       }
       await res.body?.cancel()
+      const origin = current.origin
       current = new URL(location, current)
+      // As fetch does on its own: another site never gets this one's credentials
+      if (current.origin !== origin && headers) {
+        const rest = new Headers(headers)
+        rest.delete('authorization')
+        rest.delete('cookie')
+        rest.delete('proxy-authorization')
+        headers = Object.fromEntries(rest)
+      }
       const next = current.hostname.replace(/^\[|\]$/g, '')
       if (!['http:', 'https:'].includes(current.protocol)) throw new TypeError('Redirect to a non-http URL')
       if (!allowPrivate && net.isIP(next) && isPrivateAddress(next)) throw new BlockedHostError(next)

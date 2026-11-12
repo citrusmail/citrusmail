@@ -15,7 +15,7 @@ export default defineEventHandler(async (event): Promise<Contact> => {
     throw createError({ status: 404, message: 'This contact no longer exists' })
   }
 
-  await putObject(dav, url, patchVcard(existing.data, body), existing.etag)
+  await putObject(dav, url, patchVcard(existing.data, body), existing.etag, true)
 
   return { ...body, id, bookId: encodeId(book.url) }
 })

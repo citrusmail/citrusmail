@@ -83,12 +83,19 @@ export async function runOutbox(): Promise<void> {
     for (const key of keys) {
       const item = await outbox().getItem<OutboxItem>(key)
       if (!item || item.sendAt > Date.now()) continue
-      const { account: stored, message } = await unsealValue<{ account: AccountSettings, message: OutgoingMessage }>(item.sealed)
+      // One that can't be opened (the secret changed) doesn't hold up the ones after it
+      const opened = await unsealValue<{ account: AccountSettings, message: OutgoingMessage }>(item.sealed).catch(() => undefined)
+      if (!opened) continue
+      const { account: stored, message } = opened
       let account = stored
+      let sealed = item.sealed
       try {
         // An OAuth mailbox's token may have expired while the message waited
         account = await freshAccount(stored)
-        if (account !== stored) await outbox().setItem(key, { ...item, sealed: await sealValue({ account, message }) } as never)
+        if (account !== stored) {
+          sealed = await sealValue({ account, message })
+          await outbox().setItem(key, { ...item, sealed } as never)
+        }
         // Files it in Sent too (or the JMAP server does)
         await mailFor(account).send(message)
         await outbox().removeItem(key)
@@ -98,10 +105,10 @@ export async function runOutbox(): Promise<void> {
         const reason = describeMailError(error, account.outgoing, false).message
         if (attempts >= MAX_ATTEMPTS) {
           // Kept, so it can be opened and sent by hand; never retried on its own again
-          await outbox().setItem(key, { ...item, attempts, sendAt: Number.MAX_SAFE_INTEGER } as never)
+          await outbox().setItem(key, { ...item, sealed, attempts, sendAt: Number.MAX_SAFE_INTEGER } as never)
           await updateList(account, list => list.map(entry => entry.id === item.id ? { ...entry, status: 'failed', error: reason } : entry))
         } else {
-          await outbox().setItem(key, { ...item, attempts, sendAt: Date.now() + attempts * 2 * 60_000 } as never)
+          await outbox().setItem(key, { ...item, sealed, attempts, sendAt: Date.now() + attempts * 2 * 60_000 } as never)
         }
       }
     }

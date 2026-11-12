@@ -462,7 +462,9 @@ async function run(email: string): Promise<DiscoveryResult> {
  * presets are ours (Proton Mail Bridge is on 127.0.0.1 on purpose)
  */
 async function publicOnly(result: DiscoveryResult): Promise<DiscoveryResult> {
-  if (result.source === 'preset' || result.source === 'mx') return result
+  if (result.source === 'preset') return result
+  // A preset found by MX: its mail servers are ours, the DAV and JMAP beside them came from the domain's DNS
+  const ours = result.source === 'mx'
   const isPublic = (host?: string) => host ? resolveHost(host, false).then(() => true, () => false) : Promise.resolve(false)
   const urlHost = (url?: string) => {
     try {
@@ -474,7 +476,7 @@ async function publicOnly(result: DiscoveryResult): Promise<DiscoveryResult> {
   const [incoming, outgoing, caldav, carddav, jmap] = await Promise.all([
     isPublic(result.incoming?.host), isPublic(result.outgoing?.host), isPublic(urlHost(result.caldav)), isPublic(urlHost(result.carddav)), isPublic(urlHost(result.jmap))
   ])
-  const mail = incoming && outgoing
+  const mail = ours || (incoming && outgoing)
   return {
     ...result,
     incoming: mail ? result.incoming : undefined,

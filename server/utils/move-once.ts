@@ -44,7 +44,8 @@ async function alreadyIn(account: AccountSettings, folder: string, ids: string[]
 export interface AutoMove {
   from: string
   to: string
-  criteria: SearchObject
+  /** Several searches: only what every one of them finds */
+  criteria: SearchObject | SearchObject[]
   /** Checks each found message (its envelope and arrival time), as a search can match more */
   keep?: (message: FetchMessageObject) => boolean
   markRead?: boolean
@@ -54,8 +55,15 @@ export interface AutoMove {
 export async function moveOnce(account: AccountSettings, { from, to, criteria, keep, markRead }: AutoMove): Promise<number> {
   const done = await movedFor(account)
   const candidates = await withMailbox(account, from, async (client): Promise<Candidate[]> => {
-    const uids = await client.search(criteria, { uid: true }).catch(() => false)
-    if (!Array.isArray(uids) || !uids.length) return []
+    let uids: number[] | undefined
+    for (const search of [criteria].flat()) {
+      const found = await client.search(search, { uid: true }).catch(() => false)
+      if (!Array.isArray(found)) return []
+      const hits = new Set(found)
+      uids = uids ? uids.filter(uid => hits.has(uid)) : found
+      if (!uids.length) return []
+    }
+    if (!uids) return []
     const fetched = await client.fetchAll(uids.join(','), { uid: true, envelope: true, internalDate: true }, { uid: true })
     const validity = client.mailbox ? String(client.mailbox.uidValidity) : ''
     return fetched

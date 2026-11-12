@@ -29,7 +29,7 @@ export default defineEventHandler(async (event): Promise<CalendarEvent> => {
   const updated = patchCalendar(found.object.data, id, body, zone)
 
   if (found.calendar === target) {
-    await putObject(dav, found.object.url, updated, found.object.etag)
+    await putObject(dav, found.object.url, updated, found.object.etag, true)
   } else {
     // Moved: written to the new calendar first, so a failure loses nothing
     await putObject(dav, objectUrl(target, basename, '.ics'), updated)
