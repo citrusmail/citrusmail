@@ -2,6 +2,8 @@
 
 An open-source mail, calendar and contacts client for any provider, built with [Nuxt 4](https://nuxt.com) and [Nuxt UI 4](https://ui.nuxt.com).
 
+![CitrusMail showing an inbox with a message open](.github/screenshot.webp)
+
 - **Mail** over IMAP, POP3 or [JMAP](#jmap), sending over SMTP (or through the JMAP server)
 - **Calendar** over CalDAV, using the [Nuxt UI calendar template](https://github.com/nuxt-ui-templates/calendar): day, week, month and year views, drag and drop, and quick events
 - **Contacts** over CardDAV
@@ -178,6 +180,20 @@ Press `?` anywhere in the app to see every shortcut. The main ones:
 - Sign-in attempts are rate-limited per address and per mailbox.
 
 Found a security problem? Please report it privately, as described in [SECURITY.md](SECURITY.md), rather than in a public issue.
+
+## Contributing
+
+Issues and pull requests are welcome. Before you open a pull request, run the same checks as CI:
+
+```bash
+pnpm install
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run build
+```
+
+Keep each pull request to one change, and say in the description what it fixes or adds. For security problems, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
 
 ## License
 
