@@ -2,26 +2,43 @@ import type { FetchMessageObject, SearchObject } from 'imapflow'
 import { accountKey, inBackground, withImap, withMailbox } from './imap'
 import { moveOnce } from './move-once'
 
-function criteriaFor(rule: MailRule, validity: string): SearchObject | undefined {
+export function criteriaFor(rule: MailRule, validity: string): SearchObject[] | undefined {
   const parts: SearchObject[] = rule.conditions
     .filter(condition => condition.value.trim())
     .map(({ field, value }) => ({ [field]: value.trim() }))
   if (!parts.length) return undefined
 
-  const criteria: SearchObject = rule.match === 'any' && parts.length > 1
-    ? { or: parts }
-    : Object.assign({}, ...parts)
+  // "All": one search ANDs its keys, and a key fits in it once. Two conditions
+  // on the same field are searches of their own; moveOnce takes what all find
+  const searches: SearchObject[] = rule.match === 'any' && parts.length > 1 ? [{ or: parts }] : []
+  if (!searches.length) {
+    for (const part of parts) {
+      const field = Object.keys(part)[0]!
+      const free = searches.find(search => !(field in search))
+      if (free) Object.assign(free, part)
+      else searches.push({ ...part })
+    }
+  }
+  const criteria = searches[0]!
   // A rule saved without "apply to existing" only sees mail that arrived after
   // it: by UID when the mark is this Inbox's, otherwise by the time it was made
   // (SEARCH SINCE is by day, so fileFrom drops what came earlier that day)
   if (rule.after && rule.after.validity === validity) criteria.uid = `${rule.after.uid}:*`
   else if (rule.after?.at) criteria.since = new Date(rule.after.at)
-  return criteria
+  return searches
 }
 
-/** When a rule starts, for a mark that isn't this Inbox's UIDs */
-function notBefore(rule: MailRule, validity: string) {
-  return rule.after && rule.after.validity !== validity ? rule.after.at : undefined
+/**
+ * What a rule with a start mark may touch among what the search found. The
+ * search alone finds too much: `UID n:*` always includes the newest message,
+ * even one before n, and SINCE goes by day
+ */
+export function fromMark(rule: MailRule, validity: string) {
+  const { after } = rule
+  if (!after) return undefined
+  if (after.validity === validity) return (msg: FetchMessageObject) => msg.uid >= after.uid
+  const { at } = after
+  return at === undefined ? undefined : (msg: FetchMessageObject) => new Date(msg.internalDate ?? 0).getTime() >= at
 }
 
 /**
@@ -103,8 +120,7 @@ function parentsOf(rule: MailRule, rules: MailRule[]) {
 }
 
 /** Each message is filed once: a server that leaves the original behind doesn't get it copied again every check */
-function fileFrom(account: AccountSettings, source: string, rule: MailRule, criteria: SearchObject, from?: number) {
-  const keep = from === undefined ? undefined : (msg: FetchMessageObject) => new Date(msg.internalDate ?? 0).getTime() >= from
+function fileFrom(account: AccountSettings, source: string, rule: MailRule, criteria: SearchObject[], keep?: (msg: FetchMessageObject) => boolean) {
   return moveOnce(account, { from: source, to: rule.folder, criteria, keep, markRead: rule.markRead })
 }
 
@@ -122,7 +138,7 @@ async function runFolderRules(account: AccountSettings): Promise<number> {
   let moved = 0
   for (const rule of rules) {
     const criteria = criteriaFor(rule, validity)
-    if (criteria) moved += await fileFrom(account, 'INBOX', rule, criteria, notBefore(rule, validity))
+    if (criteria) moved += await fileFrom(account, 'INBOX', rule, criteria, fromMark(rule, validity))
   }
   // A rule that applies to existing mail also sorts what its parent folder's
   // rule already filed there, so adding "AWS/Successes" after "AWS" still works

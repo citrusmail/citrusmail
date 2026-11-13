@@ -14,7 +14,7 @@ export default defineEventHandler(async (event): Promise<CalendarEvent> => {
   // A replayed create (the first one landed but its response did not) edits
   // what is there instead of failing on it
   if (existing) {
-    await putObject(dav, existing.url, patchCalendar(existing.data, body.id, body, zone), existing.etag)
+    await putObject(dav, existing.url, patchCalendar(existing.data, body.id, body, zone), existing.etag, true)
   } else {
     await putObject(dav, objectUrl(calendar, body.id, '.ics'), eventToCalendar(body, zone))
   }

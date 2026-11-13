@@ -29,6 +29,15 @@ function cidOf(attachment: ParsedMail['attachments'][number]) {
  * A parsed message as the client sees it, with cid: images inlined and remote
  * content blocked. Parse with `skipImageLinks: true` so the cid: links are still there.
  */
+/** A cid as written when it isn't valid percent-encoding ("cid:50%off" in plain text), which would throw */
+function decoded(cid: string) {
+  try {
+    return decodeURIComponent(cid)
+  } catch {
+    return cid
+  }
+}
+
 export function toMessageDetail(parsed: ParsedMail, base: Base, policy: RemotePolicy): MessageDetail {
   const from = flattenAddresses(parsed.from)[0] ?? { address: '' }
   const allowRemote = typeof policy === 'function' ? policy(from) : policy
@@ -39,7 +48,7 @@ export function toMessageDetail(parsed: ParsedMail, base: Base, policy: RemotePo
   if (parsed.html) {
     const byCid = new Map(parsed.attachments.map((a, index) => [cidOf(a), index] as const).filter(([cid]) => cid))
     const inlined = parsed.html.replace(/cid:([^"'\s)>]+)/gi, (match, cid: string) => {
-      const index = byCid.get(decodeURIComponent(cid))
+      const index = byCid.get(decoded(cid))
       if (index === undefined) return match
       embedded.add(index)
       const a = parsed.attachments[index]!

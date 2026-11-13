@@ -118,7 +118,10 @@ async function checkOne(key: string, stored: StoredPush) {
       if ([404, 410].includes((error as { statusCode?: number }).statusCode ?? 0)) return removePush(stored.subscription.endpoint)
     }
   }
-  await useStorage('citrusmail').setItem(key, { ...stored, cursors })
+  // As it is now: the renewed tokens saved above stay, and a subscription
+  // removed or replaced while this ran isn't brought back
+  const now = await useStorage('citrusmail').getItem<StoredPush>(key)
+  if (now) await useStorage('citrusmail').setItem(key, { ...now, cursors })
 }
 
 let running = false

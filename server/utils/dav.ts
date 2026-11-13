@@ -190,7 +190,10 @@ export function findCollection<T extends { url: string }>(session: DavSession<T>
 
 /** The collection an object URL sits in, so object ids are checked too */
 export function collectionOf<T extends { url: string }>(session: DavSession<T>, url: string): T {
-  const collection = session.collections.find(candidate => url.startsWith(candidate.url) && !url.slice(candidate.url.length).includes('/'))
+  // A name inside it: never the collection itself (a DELETE there would take
+  // the whole calendar or address book), nor a step back out of it
+  const inside = (name: string) => !!name && !/^(\.|%2e){1,2}$/i.test(name) && !/[/?#]/.test(name)
+  const collection = session.collections.find(candidate => url.startsWith(candidate.url) && inside(url.slice(candidate.url.length)))
   if (!collection) {
     throw createError({ status: 404, message: 'Not found' })
   }
@@ -234,15 +237,21 @@ const CONTENT_TYPES: Record<Kind, string> = {
   carddav: 'text/vcard; charset=utf-8'
 }
 
-/** PUT; `etag` guards an update, its absence makes it create-only */
-export async function putObject(session: DavSession<{ url: string }>, url: string, data: string, etag?: string): Promise<void> {
+/**
+ * PUT; `etag` guards an update, and without `update` it is create-only. A
+ * server that gave no ETag (or a weak one, which If-Match never matches)
+ * still takes the update, unguarded
+ */
+export async function putObject(session: DavSession<{ url: string }>, url: string, data: string, etag?: string, update = Boolean(etag)): Promise<void> {
+  // A weak ETag never matches If-Match (strong comparison), so it would fail every edit
+  if (etag?.startsWith('W/')) etag = undefined
   let response: Response
   try {
     response = await session.client.updateObject({
       url,
       data,
       etag,
-      headers: { 'content-type': CONTENT_TYPES[session.kind], ...(etag ? {} : { 'if-none-match': '*' }) }
+      headers: { 'content-type': CONTENT_TYPES[session.kind], ...(update ? {} : { 'if-none-match': '*' }) }
     })
   } catch (error) {
     throw davError(error, session.host, session.kind)
