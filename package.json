@@ -38,7 +38,7 @@
     "isomorphic-dompurify": "^4.6.0",
     "mailparser": "^3.14.1",
     "nodemailer": "^10.3.1",
-    "nuxt": "^4.6.3",
+    "nuxt": "^4.6.4",
     "nuxt-auth-utils": "^0.6.0",
     "tailwindcss": "^4.3.3",
     "tsdav": "^2.5.0",
