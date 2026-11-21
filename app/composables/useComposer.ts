@@ -67,6 +67,12 @@ const _useComposer = () => {
 
   const open = ref(false)
   const sending = ref(false)
+  // The docked composer (mail/composer): folded down to a bar while you look
+  // at something else, or opened out large for a long message. Its size is
+  // remembered, so the next one opens docked or large the way the last was
+  // left. Folded down isn't: a message you open is one you mean to write
+  const minimized = ref(false)
+  const expanded = useLocalStorage('citrusmail-composer-expanded', false)
   renameStoredKey('letterbox-draft', 'citrusmail-draft')
   renameStoredKey('letterbox-draft-baseline', 'citrusmail-draft-baseline')
   const draft = useLocalStorage<Draft>('citrusmail-draft', emptyDraft(), { mergeDefaults: true })
@@ -84,16 +90,57 @@ const _useComposer = () => {
     editor.value?.commands.focus('start')
   }
 
-  function start(next: Partial<Draft> = {}) {
+  // Asking whether to put the open message aside for a new one
+  const asking = ref(false)
+  const overlay = useOverlay()
+
+  /**
+   * Opens a new message, reply or forward. With one already open that has
+   * your writing in it, asks first: keep writing it, or save it to Drafts
+   * and start the new one. Nothing you wrote is ever thrown away here.
+   * Resolves false when the new one wasn't started
+   */
+  async function start(next: Partial<Draft> = {}): Promise<boolean> {
+    if (asking.value) return false
+    if (open.value && isDirty.value) {
+      if (!await setAside(next)) {
+        minimized.value = false
+        return false
+      }
+      void putAway()
+    }
     const isReply = Boolean(next.quote)
     draft.value = { ...emptyDraft(), signature: !isReply || settings.value.signatureOnReplies, ...next }
     baseline.value = fingerprint(draft.value)
     version.value++
+    minimized.value = false
     open.value = true
+    return true
+  }
+
+  // Saving to Drafts or carrying on writing; there's no choice that loses it
+  async function setAside(next: Partial<Draft>) {
+    const what = draft.value.subject.trim() ? `“${draft.value.subject.trim()}”` : 'The message you’re writing'
+    const kind = next.inReplyTo ? 'reply' : /^fwd:/i.test(next.subject ?? '') ? 'forward' : 'message'
+    asking.value = true
+    try {
+      const ConfirmDialog = (await import('~/components/confirm-dialog/index.vue')).default
+      return await overlay.create(ConfirmDialog, {
+        props: {
+          title: 'Start a new message?',
+          message: `${what} is still open. It will be saved to Drafts so you can finish it later, and the new ${kind} opens in its place.`,
+          confirmLabel: kind === 'message' ? 'Save and start new' : kind === 'reply' ? 'Save and reply' : 'Save and forward',
+          cancelLabel: 'Keep writing',
+          color: 'primary'
+        }
+      }).open().result === true
+    } finally {
+      asking.value = false
+    }
   }
 
   function compose(to: Address[] = []) {
-    start({ to })
+    void start({ to })
   }
 
   function reply(message: MessageDetail, all = false) {
@@ -103,7 +150,7 @@ const _useComposer = () => {
       ? [...message.to, ...message.cc].filter(address => address.address.toLowerCase() !== self && !primary.some(p => p.address === address.address))
       : []
 
-    start({
+    void start({
       to: primary,
       cc: others,
       subject: prefixed('Re', message.subject),
@@ -121,7 +168,7 @@ const _useComposer = () => {
   }
 
   function forward(message: MessageDetail) {
-    start({
+    void start({
       subject: prefixed('Fwd', message.subject),
       ...quote(message, `---------- Forwarded message ----------\nFrom: ${formatAddress(message.from)}\nDate: ${fullDate(message.date)}\nSubject: ${message.subject}`)
     })
@@ -133,7 +180,7 @@ const _useComposer = () => {
       const blob = await $fetch<Blob>(`/api/messages/${encodeURIComponent(message.id)}/attachments/${file.index}`, { query: { folder: message.folder }, responseType: 'blob' })
       return { filename: file.filename, contentType: file.contentType, content: await blobToBase64(blob) }
     })).catch(() => [] as OutgoingAttachment[])
-    start({
+    void start({
       to: message.to,
       cc: message.cc,
       subject: message.subject,
@@ -147,7 +194,7 @@ const _useComposer = () => {
 
   /** A scheduled message taken back out to edit */
   function reopen(message: OutgoingMessage) {
-    start({ ...message, cc: message.cc ?? [], bcc: message.bcc ?? [], attachments: message.attachments ?? [], signature: false })
+    void start({ ...message, cc: message.cc ?? [], bcc: message.bcc ?? [], attachments: message.attachments ?? [], signature: false })
   }
 
   function reset() {
@@ -158,9 +205,12 @@ const _useComposer = () => {
 
   function discard() {
     const saved = draft.value.savedAs
+    // Thrown out by mistake, it comes back with Undo (saved again on closing)
+    const kept: Draft | undefined = isDirty.value || saved ? { ...JSON.parse(JSON.stringify(draft.value)), savedAs: undefined } : undefined
     reset()
     open.value = false
     if (saved) $fetch('/api/drafts', { method: 'DELETE', query: saved }).catch(() => {})
+    if (kept) toast.add({ title: 'Draft discarded', icon: 'i-lucide-trash-2', actions: [{ label: 'Undo', color: 'neutral', variant: 'outline', onClick: () => restore(kept) }] })
   }
 
   // Your words, then the signature, then the original
@@ -197,6 +247,11 @@ const _useComposer = () => {
   async function close() {
     open.value = false
     if (!isDirty.value) return reset()
+    await putAway()
+  }
+
+  /** The draft goes to Drafts, with a toast to reopen it, and the composer starts clean */
+  async function putAway() {
     const kept: Draft = JSON.parse(JSON.stringify(draft.value))
     reset()
     const reopenAction = { label: 'Reopen', color: 'neutral' as const, variant: 'outline' as const, onClick: () => restore(kept) }
@@ -212,6 +267,7 @@ const _useComposer = () => {
     draft.value = kept
     baseline.value = ''
     version.value++
+    minimized.value = false
     open.value = true
   }
 
@@ -263,12 +319,23 @@ const _useComposer = () => {
     draft.value.attachments = draft.value.attachments.filter((_, i) => i !== index)
   }
 
-  // A reload in the middle of writing brings the composer straight back
+  // An unsent message from last time is offered back, not thrown open: a
+  // composer over the inbox is the wrong first thing to see on opening the app
   onNuxtReady(() => {
-    if (isDirty.value) open.value = true
+    if (!isDirty.value || open.value) return
+    toast.add({
+      title: 'You have an unsent message',
+      description: draft.value.subject || undefined,
+      icon: 'i-lucide-file-pen-line',
+      duration: 10_000,
+      actions: [{ label: 'Continue writing', color: 'neutral', variant: 'outline', onClick: () => {
+        minimized.value = false
+        open.value = true
+      } }]
+    })
   })
 
-  defineShortcuts({
+  defineKeys({
     c: () => compose(),
     meta_enter: {
       usingInput: true,
@@ -276,16 +343,19 @@ const _useComposer = () => {
     }
   })
 
-  // The editor keeps Escape from the modal, so the composer closes itself. A
-  // plain listener, because a shortcut would cancel Escape for every menu in
-  // the app. An open menu or suggestion list closes first
+  // Escape folds the composer down while you're in it: what you were writing
+  // stays a click away. Large, it first goes back to its corner. A plain
+  // listener, because a shortcut would cancel Escape for every menu in the
+  // app; an open menu or suggestion list closes first
   useEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key !== 'Escape' || !open.value || event.defaultPrevented) return
     if (document.querySelector('[data-reka-popper-content-wrapper]:has([role="menu"], [role="listbox"], [role="dialog"])')) return
-    close()
+    if (!(document.activeElement as HTMLElement | null)?.closest('[data-composer-dock]')) return
+    if (expanded.value) expanded.value = false
+    else minimized.value = true
   })
 
-  return { open, sending, draft, version, isDirty, editor, focusBody, start, compose, reply, forward, editDraft, reopen, close, discard, send, attach, detach }
+  return { open, asking, minimized, expanded, sending, draft, version, isDirty, editor, focusBody, start, compose, reply, forward, editDraft, reopen, close, discard, send, attach, detach }
 }
 
 export const useComposer = createAppComposable(_useComposer)

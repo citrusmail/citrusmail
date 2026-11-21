@@ -54,7 +54,7 @@ const avatarAddress = computed(() => props.sent ? props.message.to[0] : props.me
               <span
                 v-if="sent"
                 class="text-muted font-normal"
-              >To </span>{{ person }}
+              >To </span><MailMark :text="person" />
             </span>
             <span class="shrink-0 flex items-center gap-1.5 text-xs text-muted tabular-nums">
               <UIcon
@@ -77,7 +77,7 @@ const avatarAddress = computed(() => props.sent ? props.message.to[0] : props.me
             <span
               class="flex-1 truncate text-sm"
               :class="message.unread ? 'font-semibold text-highlighted' : 'text-toned'"
-            >{{ message.subject || '(No subject)' }}</span>
+            ><MailMark :text="message.subject || '(No subject)'" /></span>
             <MailReceiptBadge
               v-if="message.receipt"
               :receipt="message.receipt"
@@ -85,7 +85,7 @@ const avatarAddress = computed(() => props.sent ? props.message.to[0] : props.me
           </span>
 
           <span class="block text-sm text-muted truncate mt-0.5">
-            {{ message.preview }}
+            <MailMark :text="message.preview" />
           </span>
           <span
             v-if="note"

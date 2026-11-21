@@ -1,5 +1,9 @@
 <script setup lang="ts">
-const { draft, isDirty, editor, discard } = useComposer()
+// Without its footer, the send bar goes where the page puts it (a forward
+// puts it under the message being passed on)
+withDefaults(defineProps<{ footer?: boolean }>(), { footer: true })
+
+const { draft, editor } = useComposer()
 const { writing } = useAiReply()
 const { translating, fallback } = useReplyTranslation()
 
@@ -9,14 +13,6 @@ watchEffect(() => {
 })
 
 const drop = useComposerDrop(() => editor.value)
-const picker = useTemplateRef('picker')
-const { attach } = useComposer()
-
-async function picked(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (input.files?.length) await attach(Array.from(input.files))
-  input.value = ''
-}
 </script>
 
 <template>
@@ -35,9 +31,10 @@ async function picked(event: Event) {
       placeholder="Write your message"
       :image="{ allowBase64: true, HTMLAttributes: { style: 'max-width:100%;height:auto' } }"
       :editor-props="{ handlePaste: (_view: unknown, event: ClipboardEvent) => drop.onPaste(event) }"
+      data-composer-scroll
       class="flex-1 flex flex-col min-h-0 overflow-y-auto"
       :class="[writing && 'lb-ai-writing', translating && fallback && 'lb-tr-editing']"
-      :ui="{ content: 'order-1 px-5 pt-4 pb-5', base: 'px-0 sm:px-0 min-h-24 text-[15px] leading-normal text-default *:my-0 [&_p]:leading-normal [&_li]:my-0 [&_:is(ul,ol,blockquote,pre)]:my-2 [&_img]:rounded-md [&_img]:my-2 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary' }"
+      :ui="{ content: 'order-1 flex-none !h-auto px-5 pt-4 pb-0', base: 'px-0 sm:px-0 min-h-[3em] text-[15px] leading-normal text-default *:my-0 [&_p]:leading-normal [&_li]:my-0 [&_:is(ul,ol,blockquote,pre)]:my-2 [&_img]:rounded-md [&_img]:my-2 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary' }"
     >
       <MailComposerExtras class="order-2" />
       <!-- The space under the signature still puts the cursor in the message -->
@@ -47,41 +44,14 @@ async function picked(event: Event) {
       />
 
       <MailComposerAttachments class="order-3" />
-
-      <footer class="order-4 sticky bottom-0 mt-auto flex items-center gap-1 px-3 py-2.5 border-t border-default bg-default">
-        <UTooltip :text="isDirty ? 'Discard draft' : 'Close'">
-          <UButton
-            icon="i-lucide-trash-2"
-            color="neutral"
-            variant="ghost"
-            :aria-label="isDirty ? 'Discard draft' : 'Close'"
-            @click="discard"
-          />
-        </UTooltip>
-        <UTooltip text="Attach files">
-          <UButton
-            icon="i-lucide-paperclip"
-            color="neutral"
-            variant="ghost"
-            aria-label="Attach files"
-            @click="picker?.click()"
-          />
-        </UTooltip>
-        <MailReceiptToggle />
-        <input
-          ref="picker"
-          type="file"
-          multiple
-          class="hidden"
-          @change="picked"
-        >
-
-        <div class="ms-auto flex items-center gap-1">
-          <MailComposerToolbar :editor="instance" />
-          <MailSendButton class="ms-2" />
-        </div>
-      </footer>
     </UEditor>
+
+    <!-- Outside the scrolling message, so Send stays put however long it gets -->
+    <MailComposerFooter
+      v-if="footer"
+      :editor="editor"
+      class="shrink-0 sticky bottom-0"
+    />
 
     <MailDropZone :drop="drop" />
   </div>

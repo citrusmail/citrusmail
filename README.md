@@ -7,7 +7,9 @@ An open-source mail, calendar and contacts client for any provider, built with [
 - **Mail** over IMAP, POP3 or [JMAP](#jmap), sending over SMTP (or through the JMAP server)
 - **Calendar** over CalDAV, using the [Nuxt UI calendar template](https://github.com/nuxt-ui-templates/calendar): day, week, month and year views, drag and drop, and quick events
 - **Contacts** over CardDAV
-- **Composer** built on the Nuxt UI `UEditor`, adapted from the [editor template](https://github.com/nuxt-ui-templates/editor), with send later
+- **Swipe between sections**: two fingers sideways on a trackpad slide between Mail, Calendar and Contacts, like spaces in Arc
+- **Composer** built on the Nuxt UI `UEditor`, adapted from the [editor template](https://github.com/nuxt-ui-templates/editor): it docks in the corner so the app stays usable, folds down to a bar, opens out large for a long message, and has send later
+- **Search** that marks what matched, in the list and in the open message, as you type, with no search index
 - **Read receipts**: Delivered, Opened or Bounced on the messages you track
 - **AI** with your own key for Anthropic (Claude), OpenAI, Google Gemini, xAI Grok or Perplexity: summaries, AI Reply, and questions across your mail
 - **Translation** of messages you receive and replies you write
@@ -94,8 +96,10 @@ The sign-in page then shows **Sign in with Microsoft** for those addresses. The 
 - **Password or token**: type your password, an app password or an API token. CitrusMail tries it as a password (Basic auth), then as a token (Bearer), and remembers which worked. Fastmail's JMAP takes an API token, made under Settings → Privacy & Security → Manage API tokens. With an app password, Fastmail signs in over IMAP instead.
 - **Sending**: when the server offers JMAP submission, mail goes out through it (EmailSubmission) and lands in Sent on its own, so SMTP settings are optional. Otherwise CitrusMail sends over the SMTP server under **Outgoing** and files a copy in Sent.
 - **What works**: folders (create, rename, delete), the message list with search and filters, reading, attachments, the original message, read and flagged, move, delete (to Trash, or for good from Trash), drafts, AI search, new-mail notifications, sender allow and block lists, rules, read receipts and delivery reports, and settings that follow you (kept in an unsubscribed **CitrusMail Settings** mailbox, as over IMAP).
-- **Subscriptions**: the subscriptions page reads the Inbox's List-Unsubscribe headers over JMAP too.
+- **Subscriptions**: Settings → Subscriptions reads the Inbox's List-Unsubscribe headers over JMAP too.
 - **Switching between IMAP and JMAP**: rules and notification folders find their folders by name on the other protocol, so they keep working when an account moves to JMAP, or when one device uses IMAP and another JMAP on the same mailbox.
+- **JMAP first, IMAP as the fallback**: a mailbox signed in over IMAP moves to JMAP the next time the app starts, if its server answers JMAP (checked for at most 3 seconds). A mailbox on JMAP whose server stops answering (no answer or a server error, never a wrong password) moves to IMAP, and the app reloads; JMAP is tried again 5 minutes later. Servers you enter yourself under **Server settings** keep the protocol you chose. `CITRUSMAIL_JMAP_DISCOVERY=off` keeps everyone on IMAP.
+- **A server that speaks JMAP without saying so**: list its host in `CITRUSMAIL_JMAP_HOSTS` (comma-separated `host`, `host:port`, or `http://host:port` without TLS), and mailboxes on it sign in over JMAP. A pinned `NUXT_MAIL_IMAP_HOST` is checked for JMAP the same way.
 - **Not yet over JMAP**: JMAP push. Notifications use the minute-by-minute check.
 
 Tested against [Stalwart](https://stalw.art) 1.1 and 0.11. It is written to the RFCs and should work with [Fastmail](https://www.fastmail.com) and [Cyrus IMAP](https://www.cyrusimap.org) 3.x, but they haven't been tested yet: reports are welcome.
@@ -126,6 +130,8 @@ Set these variables and people only enter an email and a password: the server se
 | `NUXT_SESSION_NAME` | The session cookie's name, `citrusmail-session` by default. Give each instance its own when several run on one host, since browsers share cookies across ports |
 | `NUXT_MAIL_ALLOW_PRIVATE_HOSTS` | `true` if your mail server is on a private network. Off by default, so the server can't be pointed at internal machines |
 | `NUXT_TRUST_PROXY` | `true` behind a reverse proxy, so rate limits see each visitor's address |
+| `CITRUSMAIL_JMAP_HOSTS` | Mail hosts that answer JMAP as well as IMAP without publishing `/.well-known/jmap`, e.g. `mail.example.com,http://127.0.0.1:8080`. See [JMAP](#jmap) |
+| `CITRUSMAIL_JMAP_DISCOVERY` | `off` to sign in over IMAP even where JMAP is found |
 | `NUXT_FAIVELO_URL` | `https://faivelo.com` to let [Faivelo](https://faivelo.com) mailboxes have Faivelo track their opens. Off by default |
 
 ## Make it yours
@@ -160,7 +166,7 @@ In Docker, mount a volume at `/app/.data` (or wherever the app runs from). Witho
 
 ## Keyboard
 
-Press `?` anywhere in the app to see every shortcut. The main ones:
+Press `?` anywhere in the app to see every shortcut. The main ones are below. Single-key shortcuts can be switched off, all together or one by one, in **Settings → Reading**; arrows, Delete and anything held with `⌘` or `Ctrl` always work.
 
 | Mail | | Calendar | |
 | --- | --- | --- | --- |

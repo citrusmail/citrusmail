@@ -337,7 +337,37 @@ async function wellKnownJmap(host: string, port = 443): Promise<string | undefin
   return found.protocol === 'https:' && baseDomain(found.hostname) === baseDomain(host) ? found.toString() : undefined
 }
 
+/** CITRUSMAIL_JMAP_DISCOVERY=off: sign in over IMAP even where JMAP is found */
+export const jmapDiscoveryOff = () => process.env.CITRUSMAIL_JMAP_DISCOVERY === 'off'
+
+/**
+ * CITRUSMAIL_JMAP_HOSTS: mail hosts that answer JMAP as well as IMAP without
+ * publishing /.well-known/jmap on the domain. Comma-separated `host`,
+ * `host:port`, or `http://host:port` for one without TLS (a server on this
+ * machine). The session URL for `host`, when it's listed
+ */
+export function knownJmap(host: string | undefined): string | undefined {
+  if (!host || jmapDiscoveryOff()) return undefined
+  for (const item of (process.env.CITRUSMAIL_JMAP_HOSTS ?? '').split(',').map(entry => entry.trim()).filter(Boolean)) {
+    const plain = item.startsWith('http://')
+    const [name, port] = item.replace(/^https?:\/\//, '').split(':')
+    if (name?.toLowerCase() !== host.toLowerCase()) continue
+    const scheme = plain ? 'http' : 'https'
+    return `${scheme}://${name}${port ? `:${port}` : ''}/.well-known/jmap`
+  }
+  return undefined
+}
+
+/** Whether a pinned mail host (NUXT_MAIL_IMAP_HOST) answers JMAP too */
+export async function jmapOnHost(host: string): Promise<string | undefined> {
+  if (jmapDiscoveryOff()) return undefined
+  return knownJmap(host) ?? (/[a-z]/i.test(host) && !host.includes(':') ? await withTimeout(wellKnownJmap(host)) : undefined)
+}
+
 export async function findJmap(domain: string, mailHost?: string): Promise<string | undefined> {
+  if (jmapDiscoveryOff()) return undefined
+  const known = knownJmap(mailHost)
+  if (known) return known
   const hosts = [domain, ...(mailHost && /[a-z]/i.test(mailHost) && !mailHost.includes(':') && mailHost !== domain ? [mailHost] : [])]
   // All at once, so a host that never answers costs one timeout, not one after another
   const [fromSrv, ...found] = await Promise.all([
@@ -404,7 +434,7 @@ export async function discover(email: string): Promise<DiscoveryResult> {
     found.incoming && (!found.caldav || !found.carddav) && !ours ? davOnMailHosts([found.incoming.host, found.outgoing?.host]) : { caldav: undefined, carddav: undefined },
     ours || found.oauth ? undefined : findJmap(email.split('@')[1] ?? '', found.incoming?.host)
   ])
-  found = { ...found, caldav: found.caldav ?? onHost.caldav, carddav: found.carddav ?? onHost.carddav, jmap: found.jmap ?? jmap }
+  found = { ...found, caldav: found.caldav ?? onHost.caldav, carddav: found.carddav ?? onHost.carddav, jmap: jmapDiscoveryOff() ? undefined : found.jmap ?? jmap }
   const result = await publicOnly(found)
   cache.set(email, { at: Date.now(), result })
   if (cache.size > 1000) cache.delete(cache.keys().next().value!)

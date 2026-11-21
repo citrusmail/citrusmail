@@ -58,6 +58,13 @@ export interface AccountSettings {
   incoming: IncomingSettings
   /** With JMAP, only used when the JMAP server can't send mail itself */
   outgoing: ServerSettings
+  /**
+   * Signed in over JMAP on a server that speaks IMAP too: the IMAP server,
+   * read instead while JMAP is down (server/utils/protocol-switch.ts)
+   */
+  imapFallback?: IncomingSettings
+  /** Servers entered by hand (Advanced): their protocol is a choice, never changed for them */
+  serversChosen?: boolean
   /** CalDAV / CardDAV root, e.g. https://dav.example.com. Empty = feature off */
   caldav?: string
   carddav?: string
@@ -113,6 +120,8 @@ export interface SessionAccount {
 export interface MailboxSummary {
   email: string
   name?: string
+  /** How it's read: a change means its saved message ids no longer apply */
+  protocol?: MailProtocol
 }
 
 /* ------------------------------------------------------------------ */
@@ -375,6 +384,10 @@ export interface UserSettings {
   view?: MailView
   /** The message list's width in the split view, in px */
   listWidth?: number
+  /** One-key shortcuts (c to write, e to archive…); on when unset */
+  shortcuts?: boolean
+  /** One-key shortcuts switched off one by one, by id (app/utils/shortcuts.ts); none when unset */
+  shortcutsOff?: string[]
   /** ISO 639-1 code messages are translated into; English when unset */
   language?: string
   /** The AI provider whose key is used, when more than one is saved */

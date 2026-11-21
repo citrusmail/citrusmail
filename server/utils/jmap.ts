@@ -161,7 +161,8 @@ async function failure(res: Response): Promise<JmapError> {
   // Request-level errors are RFC 7807 problem details
   const problem = await readJson(res).catch(() => undefined) as { type?: string, detail?: string } | undefined
   const type = problem?.type?.replace('urn:ietf:params:jmap:error:', '')
-  return new JmapError(problem?.detail || `HTTP ${res.status}`, type)
+  // The status goes along, so a server error (5xx) reads as an outage
+  return Object.assign(new JmapError(problem?.detail || `HTTP ${res.status}`, type), { responseCode: res.status })
 }
 
 /**

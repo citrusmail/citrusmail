@@ -233,8 +233,9 @@ export default defineAppConfig({
     },
     modal: {
       slots: {
-        content: `${floating} divide-default`,
-        overlay
+        // z-50: above the docked composer (z-40), which can open one
+        content: `${floating} divide-default z-50`,
+        overlay: `${overlay} z-50`
       },
       variants: {
         // A sheet with a gutter on a phone, the centered box above `sm`
@@ -283,8 +284,8 @@ export default defineAppConfig({
     },
     slideover: {
       slots: {
-        overlay,
-        content: `${floating} divide-default`
+        overlay: `${overlay} z-50`,
+        content: `${floating} divide-default z-50`
       }
     },
     tabs: {

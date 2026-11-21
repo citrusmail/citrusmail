@@ -9,7 +9,7 @@ const isForward = computed(() => /^fwd:/i.test(draft.value.subject))
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 px-5 pb-5">
+  <div class="flex flex-col gap-4 px-5 pt-3 pb-5">
     <div
       v-if="draft.signature && settings.signature"
       class="group relative max-w-full overflow-x-auto"

@@ -61,6 +61,11 @@ export async function withAccount<T>(event: RequestEvent, fn: (account: AccountS
     return await fn(account)
   } catch (error) {
     if (isNuxtError(error)) throw error
+    // JMAP down but IMAP up: the mailbox moves to IMAP and the app reloads
+    // (message ids differ between the two, see protocol-switch.ts)
+    if (await fallBackToImap(event, account, error)) {
+      throw createError({ status: 503, message: 'Reconnecting to your mail…', data: { protocolSwitched: true } })
+    }
     const { mailboxMissing, responseText } = error as { mailboxMissing?: boolean, responseText?: string }
     if (mailboxMissing || /no such mailbox|nonexistent|doesn't exist|does not exist|unknown mailbox/i.test(responseText ?? '')) {
       throw createError({ status: 404, message: 'That folder doesn\'t exist.' })
@@ -79,7 +84,7 @@ export function toSessionAccount(account: AccountSettings, others: AccountSettin
     protocol: account.incoming.protocol,
     hasCalendar: Boolean(account.caldav),
     hasContacts: Boolean(account.carddav),
-    mailboxes: [account, ...others].map(item => ({ email: item.email, name: item.name }))
+    mailboxes: [account, ...others].map(item => ({ email: item.email, name: item.name, protocol: item.incoming.protocol }))
   }
 }
 
@@ -174,8 +179,12 @@ export async function discoverAccount(email: string): Promise<DiscoveryResult> {
   const config = mailConfig()
   if (config.incoming && config.outgoing) {
     // Servers set in the environment: their calendars are where they say, or on the mail host
-    const onHost = config.caldav && config.carddav ? {} : await davOnMailHosts([config.incoming.host, config.outgoing.host])
-    return { incoming: config.incoming, outgoing: config.outgoing, caldav: config.caldav ?? onHost.caldav, carddav: config.carddav ?? onHost.carddav, source: 'config' }
+    // A pinned IMAP server that speaks JMAP too signs in with JMAP, IMAP kept as the fallback
+    const [onHost, jmap] = await Promise.all([
+      config.caldav && config.carddav ? { caldav: undefined, carddav: undefined } : davOnMailHosts([config.incoming.host, config.outgoing.host]),
+      config.incoming.protocol === 'imap' ? jmapOnHost(config.incoming.host) : undefined
+    ])
+    return { incoming: config.incoming, outgoing: config.outgoing, jmap, caldav: config.caldav ?? onHost.caldav, carddav: config.carddav ?? onHost.carddav, source: 'config' }
   }
   const found = await discover(email)
   return {

@@ -8,6 +8,7 @@ const TABS = {
   reading: { title: 'Reading', description: 'How messages open, and when pictures from the web load in them.' },
   notifications: { title: 'Notifications', description: 'When and how CitrusMail tells you about new mail.' },
   senders: { title: 'Senders', description: 'People and domains that always reach your Inbox, and those that never do.' },
+  subscriptions: { title: 'Subscriptions', description: 'Senders in your Inbox whose mail has an unsubscribe link, most frequent first. Most unsubscribe right here; a few only do it on their own website, which opens in a new tab.' },
   rules: { title: 'Rules', description: 'Sort incoming mail into folders on its own.' },
   tracking: { title: 'Tracking', description: 'Find out when messages you send are delivered and opened.' },
   ai: { title: 'AI', description: 'Bring your own key to draft replies, summarize long messages and ask questions of all your mail.' },
@@ -29,6 +30,7 @@ useSeoMeta({ title: () => `${TABS[tab.value].title} · Settings` })
     <SettingsReading v-else-if="tab === 'reading'" />
     <SettingsNotifications v-else-if="tab === 'notifications'" />
     <SettingsSenders v-else-if="tab === 'senders'" />
+    <SettingsSubscriptions v-else-if="tab === 'subscriptions'" />
     <SettingsAi v-else-if="tab === 'ai'" />
     <SettingsTracking v-else-if="tab === 'tracking'" />
     <SettingsAbout v-else-if="tab === 'about'" />

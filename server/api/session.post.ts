@@ -30,6 +30,9 @@ const bodySchema = z.object({
   add: z.boolean().optional()
 })
 
+/** How long sign-in waits on JMAP before trying IMAP instead */
+const JMAP_SIGN_IN_TIMEOUT = 8_000
+
 /**
  * The JMAP-only fields are dropped from IMAP and POP3 settings. A JMAP
  * session URL decides the host: it's the server actually signed in to
@@ -63,10 +66,13 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
   // The servers to try, in order. When discovery found a JMAP server it
   // goes first, and IMAP (or POP3) is the fallback when it won't sign in
   const jmap = !custom && found?.jmap && !found.oauth ? jmapIncoming(found.jmap) : undefined
-  const options: { incoming: IncomingSettings, outgoing: ServerSettings }[] = custom
-    ? [{ incoming: jmapOnly(body.incoming!), outgoing: body.outgoing ?? jmapOutgoing(body.incoming!) }]
+  // Signed in over JMAP, the IMAP server is kept to read from while JMAP is down
+  const imapFallback = found?.incoming?.protocol === 'imap' ? found.incoming : undefined
+  const options: { incoming: IncomingSettings, outgoing: ServerSettings, imapFallback?: IncomingSettings, serversChosen?: boolean }[] = custom
+    // Entered by hand: that protocol is the person's choice, never changed for them
+    ? [{ incoming: jmapOnly(body.incoming!), outgoing: body.outgoing ?? jmapOutgoing(body.incoming!), serversChosen: true }]
     : [
-        ...(jmap ? [{ incoming: jmap, outgoing: found?.outgoing ?? jmapOutgoing(jmap) }] : []),
+        ...(jmap ? [{ incoming: jmap, outgoing: found?.outgoing ?? jmapOutgoing(jmap), imapFallback }] : []),
         ...(found?.incoming && found.outgoing ? [{ incoming: found.incoming, outgoing: found.outgoing }] : [])
       ]
   if (!options.length) {
@@ -93,7 +99,11 @@ export default defineEventHandler(async (event): Promise<SessionAccount> => {
   let failure: unknown
   for (const option of options) {
     try {
-      account = await verifyAccount(JSON.parse(JSON.stringify({ ...base, ...option })))
+      const trying: AccountSettings = JSON.parse(JSON.stringify({ ...base, ...option }))
+      // A JMAP server that doesn't answer hands sign-in to IMAP quickly
+      account = options.length > 1 && option.incoming.protocol === 'jmap'
+        ? await withDeadline(verifyAccount(trying), JMAP_SIGN_IN_TIMEOUT)
+        : await verifyAccount(trying)
       break
     } catch (error) {
       failure = error

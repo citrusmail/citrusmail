@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { isOpen } = useShortcutsHelp()
+const { all: shortcuts, isOn } = useShortcutSwitches()
 </script>
 
 <template>
@@ -21,19 +22,26 @@ const { isOpen } = useShortcutsHelp()
             v-for="item in group.items"
             :key="item.label"
             class="flex items-center justify-between gap-4 text-sm text-muted"
+            :class="!isOn(item.id) && 'opacity-50'"
           >
-            <span>{{ item.label }}</span>
-            <span class="flex items-center gap-0.5">
-              <UKbd
-                v-for="key in item.keys"
-                :key="key"
-                :value="key"
-                variant="soft"
-              />
+            <span class="min-w-0 truncate">{{ item.label }}</span>
+            <span class="shrink-0 flex items-center gap-2">
+              <span
+                v-if="!isOn(item.id)"
+                class="text-xs"
+              >Off</span>
+              <ShortcutKeys :keys="item.keys" />
             </span>
           </li>
         </ul>
       </section>
+    </template>
+    <template #footer>
+      <USwitch
+        v-model="shortcuts"
+        label="One-key shortcuts"
+        description="Off, single keys do nothing. Arrows, Delete and anything with ⌘ or Ctrl still work. Settings → Reading has a switch for each one."
+      />
     </template>
   </UModal>
 </template>

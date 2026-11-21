@@ -44,7 +44,7 @@ const refresh = load
 const summary = computed(() => messages.value.find(item => item.id === props.id))
 const content = useTemplateRef('content')
 
-defineShortcuts({
+defineKeys({
   r: () => message.value && reply(message.value),
   a: () => message.value && reply(message.value, true),
   f: () => message.value && forward(message.value)

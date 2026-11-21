@@ -1,7 +1,6 @@
-export type Section = 'mail' | 'calendar' | 'contacts' | 'settings'
-
 // State the app shell shares across sections: the sidebar (expanded or
-// folded to icons on desktop, a slideover below `lg`) and which section is on screen
+// folded to icons on desktop, a slideover below `lg`), which section is on
+// screen, and where each one was last left so going back lands there
 const _useShell = () => {
   const route = useRoute()
   const { user } = useUserSession()
@@ -19,16 +18,21 @@ const _useShell = () => {
     isSidebarOpen.value = !isSidebarOpen.value
   }
 
-  const section = computed<Section>(() => {
-    if (route.path.startsWith('/calendar')) return 'calendar'
-    if (route.path.startsWith('/contacts')) return 'contacts'
-    if (route.path.startsWith('/settings')) return 'settings'
-    return 'mail'
-  })
+  const section = computed<Section>(() => sectionOf(route.path))
 
   const account = computed(() => user.value as SessionAccount | null)
 
-  return { isSidebarOpen, isCollapsed, isMobile, toggleSidebar, section, account }
+  const lastPaths = useState<Record<Section, string>>('section-paths', () => ({
+    mail: '/mail/INBOX',
+    calendar: `/calendar/week/${todayDate().toString()}`,
+    contacts: '/contacts',
+    settings: '/settings'
+  }))
+  watch(() => route.fullPath, (path) => {
+    lastPaths.value[sectionOf(route.path)] = path
+  }, { immediate: true })
+
+  return { isSidebarOpen, isCollapsed, isMobile, toggleSidebar, section, account, lastPaths }
 }
 
 export const useShell = createAppComposable(_useShell)

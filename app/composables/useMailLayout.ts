@@ -27,7 +27,7 @@ const _useMailLayout = () => {
   }
   const persistWidth = useDebounceFn(() => save({ listWidth: local.value.listWidth }, false), 600)
 
-  defineShortcuts({ shift_v: () => (view.value = view.value === 'split' ? 'list' : 'split') })
+  defineKeys({ shift_v: () => (view.value = view.value === 'split' ? 'list' : 'split') })
 
   return { view, listWidth, resize, persistWidth }
 }

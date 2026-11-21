@@ -43,6 +43,8 @@ const schema = z.object({
   }).optional(),
   view: z.enum(['split', 'list']).optional(),
   listWidth: z.number().int().min(280).max(640).optional(),
+  shortcuts: z.boolean().optional(),
+  shortcutsOff: z.array(z.string().regex(/^[a-zA-Z]{1,32}$/)).max(64).optional(),
   // The language messages are translated into
   language: z.string().regex(/^[a-z]{2,3}$/).optional(),
   aiProvider: z.enum(['anthropic', 'openai', 'gemini', 'grok', 'perplexity']).optional(),

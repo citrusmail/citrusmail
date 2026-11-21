@@ -38,7 +38,7 @@ function onEscape(event: KeyboardEvent) {
   ;(event.target as HTMLInputElement).blur()
 }
 
-defineShortcuts({
+defineKeys({
   '/': () => searchInput.value?.inputRef?.focus()
 })
 </script>
