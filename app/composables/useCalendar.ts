@@ -110,7 +110,7 @@ const _useCalendar = () => {
     }
   }
 
-  defineShortcuts({
+  defineKeys({
     // Enabled while typing so it also closes the palette from its own input
     meta_k: {
       usingInput: true,

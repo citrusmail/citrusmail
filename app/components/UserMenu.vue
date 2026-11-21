@@ -62,7 +62,7 @@ const items = computed<DropdownMenuItem[][]>(() => [[{
 ]])
 
 // Ctrl+2, 3, 4 open the other mailboxes
-defineShortcuts(Object.fromEntries([0, 1, 2].map(index => [`ctrl_${index + 2}`, () => others.value[index] && switchTo(others.value[index]!.email)])))
+defineKeys(Object.fromEntries([0, 1, 2].map(index => [`ctrl_${index + 2}`, () => others.value[index] && switchTo(others.value[index]!.email)])))
 </script>
 
 <template>

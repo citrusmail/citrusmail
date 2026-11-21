@@ -375,6 +375,10 @@ export interface UserSettings {
   view?: MailView
   /** The message list's width in the split view, in px */
   listWidth?: number
+  /** One-key shortcuts (c to write, e to archive…); on when unset */
+  shortcuts?: boolean
+  /** One-key shortcuts switched off one by one, by id (app/utils/shortcuts.ts); none when unset */
+  shortcutsOff?: string[]
   /** ISO 639-1 code messages are translated into; English when unset */
   language?: string
   /** The AI provider whose key is used, when more than one is saved */

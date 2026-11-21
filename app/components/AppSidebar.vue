@@ -7,7 +7,7 @@ watch(() => route.fullPath, () => {
   if (isMobile.value) isSidebarOpen.value = false
 })
 
-defineShortcuts({ '[': () => !isMobile.value && toggleSidebar() })
+defineKeys({ '[': () => !isMobile.value && toggleSidebar() })
 </script>
 
 <template>

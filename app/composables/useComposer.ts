@@ -268,7 +268,7 @@ const _useComposer = () => {
     if (isDirty.value) open.value = true
   })
 
-  defineShortcuts({
+  defineKeys({
     c: () => compose(),
     meta_enter: {
       usingInput: true,

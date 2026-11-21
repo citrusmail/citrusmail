@@ -13,6 +13,8 @@ const REMOTE = [
   { value: 'always', label: 'Always', description: 'Every message shows its pictures. Senders that track opens will know when you read their mail.' }
 ]
 
+const shortcuts = useOneKeyShortcuts()
+
 const { ready } = useAi()
 const languages = Object.entries(LANGUAGES).map(([value, item]) => ({ value, label: item.name, description: item.native }))
 const language = computed({
@@ -40,6 +42,18 @@ const remote = computed({
         size="sm"
         class="w-96 max-w-full mt-1"
       />
+    </UFormField>
+
+    <UFormField
+      label="Keyboard"
+      description="One key does the job: C writes a message, E archives, R replies. Switch them all off, or only the ones that get in your way. Arrows, Delete and anything with ⌘ or Ctrl always work."
+    >
+      <USwitch
+        v-model="shortcuts"
+        label="One-key shortcuts"
+        class="mt-2"
+      />
+      <SettingsShortcutList />
     </UFormField>
 
     <UFormField

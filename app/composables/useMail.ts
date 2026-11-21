@@ -336,7 +336,7 @@ const _useMail = () => {
   const when = (handler: () => void) => () => onMail() && handler()
   const withSelected = (handler: (message: MessageSummary) => void) => when(() => selected.value && handler(selected.value))
 
-  defineShortcuts({
+  defineKeys({
     'j': when(() => step(1)),
     'k': when(() => step(-1)),
     'arrowdown': when(() => step(1)),
