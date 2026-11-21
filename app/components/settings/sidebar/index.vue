@@ -19,6 +19,7 @@ const items = computed<NavigationMenuItem[]>(() => [
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/settings/notifications' },
   // POP3 has no folders to file into
   ...(folders.value ? [{ label: 'Senders', icon: 'i-lucide-shield-check', to: '/settings/senders' }] : []),
+  ...(folders.value ? [{ label: 'Subscriptions', icon: 'i-lucide-newspaper', to: '/settings/subscriptions' }] : []),
   ...(folders.value ? [{ label: 'Rules', icon: 'i-lucide-list-filter', to: '/settings/rules' }] : []),
   { label: 'Tracking', icon: 'i-lucide-mail-check', to: '/settings/tracking' },
   { label: 'AI', icon: 'i-lucide-sparkles', to: '/settings/ai' },

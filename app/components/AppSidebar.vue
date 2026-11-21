@@ -60,18 +60,16 @@ defineShortcuts({ '[': () => !isMobile.value && toggleSidebar() })
     </template>
 
     <template #default="{ state }">
+      <!-- Mail, Calendar and Contacts slide side by side as one strip, by a
+        click on the tabs or two fingers on the trackpad -->
+      <SectionTrack v-if="state === 'expanded' && SWIPE_SECTIONS.includes(section)" />
       <MailSidebar
-        v-if="section === 'mail'"
-        :collapsed="state === 'collapsed'"
+        v-else-if="section === 'mail'"
+        collapsed
       />
-      <template v-else-if="state === 'expanded'">
-        <CalendarSidebar v-if="section === 'calendar'" />
-        <ContactsSidebar v-else-if="section === 'contacts'" />
-        <SettingsSidebar v-else />
-      </template>
       <SettingsSidebar
         v-else-if="section === 'settings'"
-        collapsed
+        :collapsed="state === 'collapsed'"
       />
     </template>
 

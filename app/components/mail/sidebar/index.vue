@@ -77,8 +77,6 @@ const canFolder = computed(() => account.value?.protocol !== 'pop3')
       class="justify-start text-muted -mt-2 px-2.5"
       @click="promptCreate()"
     />
-
-    <MailSidebarExtras :collapsed="collapsed" />
   </template>
 
   <div

@@ -391,3 +391,10 @@ html.lb-has-background {
 html.lb-has-background.dark {
   --lb-desk: color-mix(in oklab, var(--lb-desk-solid) 78%, transparent);
 }
+
+/* A sideways trackpad swipe moves between Mail, Calendar and Contacts
+   (useSectionSwipe), not the browser's back and forward */
+html,
+body {
+  overscroll-behavior-x: none;
+}
