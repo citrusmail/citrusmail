@@ -92,6 +92,7 @@ export function htmlToText(html: string): string {
   return stripBlocks(html)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|li|tr|h[1-6]|blockquote)>/gi, '\n')
+    .replace(/<\/(td|th)>/gi, ' ')
     .replace(/<li[^<>]*>/gi, '- ')
     .replace(/<[^<>]*>/g, '')
     .replace(/&nbsp;/gi, ' ')
