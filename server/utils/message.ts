@@ -1,4 +1,5 @@
 import type { AddressObject, ParsedMail } from 'mailparser'
+import { previewToSnippet } from './preview-text'
 
 type Base = Pick<MessageSummary, 'id' | 'folder' | 'unread' | 'flagged'>
 
@@ -14,11 +15,7 @@ export function flattenAddresses(value?: AddressObject | AddressObject[]): Addre
 }
 
 export function makePreview(text: string, length = 140): string {
-  return text
-    .replace(/^>.*$/gm, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, length)
+  return previewToSnippet(text.replace(/^>.*$/gm, ''), length)
 }
 
 function cidOf(attachment: ParsedMail['attachments'][number]) {

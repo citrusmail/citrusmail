@@ -4,9 +4,11 @@ import type { ListQuery } from './mail-imap'
 import {
   JMAP_ID, JMAP_INBOX, JMAP_MAX_BLOB, JmapError, isJmapSyncFolder, jmapEnvelope, findJmapMailbox, findJmapRole, jmapDownload, jmapFlagPatch,
   jmapFolderOf, jmapFolderPath, jmapFolders, jmapListFilter, jmapMailboxTree, jmapMovePatch, jmapQueryCalls,
-  jmapAccountKey, jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapSignIn, jmapUpload, pickJmapIdentity, readJmapPage
+  jmapAccountKey, jmapHtmlOnly, jmapRequest, jmapSearchFilter, jmapSession, jmapSetResult, jmapSignIn, jmapUpload, pickJmapIdentity, readJmapPage
 } from './jmap'
 import type { JmapCall, JmapContext, JmapEmail, JmapMailbox, SearchLike } from './jmap'
+import { makePreview } from './message'
+import { htmlToText } from './sanitize'
 
 const PAGE = 50
 /** Messages moved per request when a folder is emptied before it's deleted */
@@ -86,6 +88,43 @@ function rememberBlobs(ctx: JmapContext, emails: JmapEmail[]) {
     blobCache.set(key, { blobId: email.blobId, size: email.size, seen: Boolean(email.keywords?.$seen), flagged: Boolean(email.keywords?.$flagged) })
   }
   while (blobCache.size > BLOB_CACHE) blobCache.delete(blobCache.keys().next().value!)
+}
+
+/** How much of an HTML-only message is read to make its preview line */
+const HTML_PREVIEW_BYTES = 16_384
+
+/**
+ * The line under an HTML-only message's subject. Servers make their own
+ * preview by dropping the tags, which runs a heading into the next paragraph
+ * ("Thanks for your orderYour invoice..."), so these few are read and turned
+ * into text the way the reader does. Any trouble keeps the server's preview
+ */
+async function htmlPreviews(ctx: JmapContext, emails: JmapEmail[]): Promise<void> {
+  const htmlOnly = emails.filter(jmapHtmlOnly)
+  if (!htmlOnly.length) return
+  try {
+    const result = await call(ctx, 'Email/get', {
+      ids: htmlOnly.map(email => email.id),
+      properties: ['id', 'textBody', 'bodyValues'],
+      bodyProperties: ['partId'],
+      fetchTextBodyValues: true,
+      maxBodyValueBytes: HTML_PREVIEW_BYTES
+    }) as { list?: JmapEmail[] }
+    const byId = new Map(emails.map(email => [email.id, email]))
+    for (const got of result.list ?? []) {
+      const partId = got.textBody?.[0]?.partId
+      let html = partId ? got.bodyValues?.[partId]?.value : undefined
+      if (!html) continue
+      // Cut short in the middle of a tag: drop the half tag
+      const open = html.lastIndexOf('<')
+      if (open > html.lastIndexOf('>')) html = html.slice(0, open)
+      const preview = makePreview(htmlToText(html))
+      const email = byId.get(got.id)
+      if (preview && email) email.preview = preview
+    }
+  } catch (error) {
+    console.warn('[citrusmail] HTML previews failed, keeping the server\'s', (error as Error).message)
+  }
 }
 
 function mailboxIn(list: JmapMailbox[], path: string): JmapMailbox {
@@ -194,7 +233,9 @@ export const jmapBackend = {
     try {
       const calls = jmapQueryCalls(await accountId(ctx), jmapListFilter(mailboxId, query), { anchor, limit: PAGE })
       const responses = await jmapRequest(ctx, calls)
-      rememberBlobs(ctx, (responses.get('g')?.list as JmapEmail[] | undefined) ?? [])
+      const emails = (responses.get('g')?.list as JmapEmail[] | undefined) ?? []
+      rememberBlobs(ctx, emails)
+      await htmlPreviews(ctx, emails)
       const page = readJmapPage(responses, folder)
       if (!query.attachments) return page
       // The server's hasAttachment filter goes by its own heuristics (some
@@ -389,7 +430,9 @@ export const jmapBackend = {
     const conditions = [jmapSearchFilter(criteria), ...(skip.length ? [{ inMailboxOtherThan: skip }] : [])].filter(c => Object.keys(c).length)
     const filter = conditions.length > 1 ? { operator: 'AND', conditions } : conditions[0] ?? {}
     const responses = await jmapRequest(ctx, jmapQueryCalls(await accountId(ctx), filter, { limit }))
-    rememberBlobs(ctx, (responses.get('g')?.list as JmapEmail[] | undefined) ?? [])
+    const emails = (responses.get('g')?.list as JmapEmail[] | undefined) ?? []
+    rememberBlobs(ctx, emails)
+    await htmlPreviews(ctx, emails)
     const page = readJmapPage(responses, email => jmapFolderOf(email, list))
     return page.messages
   }

@@ -297,7 +297,7 @@ describe('emails', () => {
     }, 'q'])
     expect(get![1]['#ids']).toEqual({ resultOf: 'q', name: 'Email/query', path: '/ids' })
     expect(get![1].properties).toContain('attachments')
-    expect(get![1].bodyProperties).toEqual(['partId', 'disposition', 'name'])
+    expect(get![1].bodyProperties).toEqual(['partId', 'disposition', 'name', 'type'])
     expect(jmapQueryCalls('A1', {}, { limit: 50 })[0]![1]).not.toHaveProperty('anchor')
   })
 

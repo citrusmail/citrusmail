@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { serverPreview } from './preview-text'
 
 /**
  * A small JMAP client (RFC 8620 core, RFC 8621 mail): the session, method
@@ -420,12 +421,20 @@ export interface JmapEmail {
   /** Parts outside the text and HTML bodies, with only the properties asked for */
   attachments?: { disposition?: string | null, name?: string | null }[] | null
   messageId?: string[] | null
+  /** The parts that make the readable text, with only the properties asked for */
+  textBody?: { partId?: string | null, type?: string | null }[] | null
+  bodyValues?: Record<string, { value: string }>
 }
 
-export const JMAP_SUMMARY_PROPERTIES = ['id', 'blobId', 'mailboxIds', 'keywords', 'from', 'to', 'subject', 'receivedAt', 'size', 'preview', 'hasAttachment', 'attachments', 'messageId']
+export const JMAP_SUMMARY_PROPERTIES = ['id', 'blobId', 'mailboxIds', 'keywords', 'from', 'to', 'subject', 'receivedAt', 'size', 'preview', 'hasAttachment', 'attachments', 'messageId', 'textBody']
 
-/** Only what deciding on the paperclip needs from each attachment part */
-export const JMAP_ATTACHMENT_PROPERTIES = ['partId', 'disposition', 'name']
+/** What the paperclip needs from each attachment part, and the type, which tells an HTML-only message */
+export const JMAP_ATTACHMENT_PROPERTIES = ['partId', 'disposition', 'name', 'type']
+
+/** The message has no plain text part, so the server made its preview from HTML */
+export function jmapHtmlOnly(email: JmapEmail): boolean {
+  return email.textBody?.length === 1 && email.textBody[0]?.type === 'text/html'
+}
 
 /**
  * Whether the paperclip shows. Servers set hasAttachment by their own
@@ -449,7 +458,7 @@ export function jmapSummary(email: JmapEmail, folder: string): MessageSummary {
     from: address(email.from?.[0] ?? undefined),
     to: (email.to ?? []).map(address),
     date: (Number.isNaN(date.getTime()) ? new Date(0) : date).toISOString(),
-    preview: (email.preview ?? '').replace(/\s+/g, ' ').trim(),
+    preview: serverPreview(email.preview),
     unread: !email.keywords?.$seen,
     flagged: Boolean(email.keywords?.$flagged),
     hasAttachments: jmapHasAttachments(email),
