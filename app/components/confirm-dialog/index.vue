@@ -3,9 +3,11 @@ withDefaults(defineProps<{
   title: string
   message?: string
   confirmLabel?: string
+  cancelLabel?: string
   color?: 'error' | 'primary'
 }>(), {
   confirmLabel: 'Confirm',
+  cancelLabel: 'Cancel',
   color: 'error'
 })
 
@@ -24,7 +26,7 @@ const emit = defineEmits<{
   >
     <template #footer>
       <UButton
-        label="Cancel"
+        :label="cancelLabel"
         color="neutral"
         variant="ghost"
         @click="emit('close', false)"

@@ -398,3 +398,36 @@ html,
 body {
   overscroll-behavior-x: none;
 }
+
+/* Menus, pickers and tooltips open above anything floating over the app,
+   like the docked composer (z-40). Reka copies the content's own z-index,
+   `auto`, onto the wrapper, which left them drawn underneath it */
+[data-reka-popper-content-wrapper] {
+  z-index: 50 !important;
+}
+
+/* One curve for everything that moves: a sheet's ease for what settles, a
+   spring with a slight settle for what rises */
+@theme {
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: linear(0, 0.033, 0.117, 0.23, 0.356, 0.483, 0.602, 0.71, 0.802, 0.878, 0.937, 0.982, 1.015, 1.036, 1.048, 1.054, 1.054, 1.051, 1.046, 1.039, 1.032, 1.025, 1.019, 1.014, 1.009, 1.005, 1.002, 1, 0.999, 0.998, 0.997, 0.997, 0.997, 0.997, 0.998, 0.998, 0.998, 0.999, 0.999, 0.999, 1);
+}
+
+/* What you're writing, lifted off the desk: shadows stacked from tight to
+   wide, the way light falls off a sheet held over a desk */
+@utility lb-frame-raised {
+  box-shadow:
+    0 0 0 1px rgb(28 25 23 / 0.07),
+    0 1px 1px rgb(28 25 23 / 0.03),
+    0 4px 8px -2px rgb(28 25 23 / 0.05),
+    0 16px 32px -12px rgb(28 25 23 / 0.12),
+    0 40px 72px -32px rgb(28 25 23 / 0.18);
+  :where(.dark) & {
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.08),
+      0 1px 1px rgb(0 0 0 / 0.3),
+      0 4px 8px -2px rgb(0 0 0 / 0.3),
+      0 16px 32px -12px rgb(0 0 0 / 0.5),
+      0 40px 72px -32px rgb(0 0 0 / 0.6);
+  }
+}
