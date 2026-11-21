@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Folds the sidebar to icons and back. Sits by your name, out of the way of the logo
+// Folds the sidebar to icons and back: a panel icon, the way Mac apps do it
 defineProps<{
   collapsed: boolean
 }>()
@@ -9,18 +9,18 @@ const { toggleSidebar } = useShell()
 
 <template>
   <UTooltip
-    :text="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+    :text="collapsed ? 'Show sidebar' : 'Hide sidebar'"
     :kbds="['[']"
-    :content="{ side: 'right' }"
+    :content="{ side: collapsed ? 'right' : 'bottom' }"
   >
     <UButton
-      :icon="collapsed ? 'i-lucide-chevrons-right' : 'i-lucide-chevrons-left'"
+      :icon="collapsed ? 'i-lucide-panel-left-open' : 'i-lucide-panel-left-close'"
       color="neutral"
       variant="ghost"
       size="sm"
       square
-      :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-      class="max-lg:hidden shrink-0 text-dimmed hover:text-highlighted"
+      :aria-label="collapsed ? 'Show sidebar' : 'Hide sidebar'"
+      class="max-lg:hidden shrink-0 text-muted hover:text-highlighted hover:bg-(--lb-tab-active)/55"
       @click="toggleSidebar"
     />
   </UTooltip>
