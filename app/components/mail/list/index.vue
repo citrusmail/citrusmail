@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { messages, status, cursor, load, folder, search, filter, filtering, selectedId } = useMail()
+const { messages, status, cursor, load, folder, search, searchPending, filter, filtering, selectedId } = useMail()
 const { view } = useMailLayout()
 const { isMobile } = useShell()
 // The list-only view packs a message into one line
@@ -31,7 +31,7 @@ const empty = computed(() => {
 
 <template>
   <div
-    v-if="status === 'loading' && !messages.length"
+    v-if="(status === 'loading' || searchPending) && !messages.length"
     class="flex-1 flex flex-col"
   >
     <div

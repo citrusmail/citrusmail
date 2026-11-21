@@ -65,17 +65,81 @@ const _useMail = () => {
   const leaveKey = (message: MessageSummary) => `${message.folder}\0${message.id}`
   const staying = (message: MessageSummary) => !leaving.has(leaveKey(message))
 
+  // AI search (below); declared here because instant search checks it
+  const ai = ref<{ on: boolean, status: 'idle' | 'loading' | 'done' | 'error', query: string, result?: AiSearchResult, error?: string }>({ on: false, status: 'idle', query: '' })
+
+  /* Instant search --------------------------------------------------- */
+  // Every message seen this session, kept by folder: on each keystroke the
+  // list shows the ones whose words begin with what's typed, and the
+  // server's answer fills in what only it can find (words deep in a
+  // message) a moment later. No search index: only mail already loaded
+  const seen = new Map<string, MessageSummary>()
+  watch(messages, (list) => {
+    for (const message of list) seen.set(`${shellAccount.value?.email}\0${leaveKey(message)}`, message)
+    if (seen.size > 20_000) [...seen.keys()].slice(0, seen.size - 20_000).forEach(key => seen.delete(key))
+  })
+  watch(() => shellAccount.value?.email, () => seen.clear())
+
+  /** This folder's mail already here that matches what's typed, newest first; undefined when it can't say */
+  function instantMatches(): MessageSummary[] | undefined {
+    const words = terms.value
+    // Filters by sender or date are the server's to answer
+    if (!words.length || filtering.value || ai.value.on) return undefined
+    const prefix = `${shellAccount.value?.email}\0`
+    const found = new Map<string, MessageSummary>()
+    for (const [key, message] of seen) {
+      if (!key.startsWith(prefix) || message.folder !== folderPath.value || !staying(message)) continue
+      if (filter.value === 'unread' && !message.unread) continue
+      if (filter.value === 'flagged' && !message.flagged) continue
+      if (messageMatches(message, words)) found.set(leaveKey(message), message)
+    }
+    return [...found.values()].sort((a, b) => b.date.localeCompare(a.date))
+  }
+
+  /**
+   * The server's answer, joined with the instant matches. An answer to
+   * fewer letters than are typed now (it was asked a moment ago) keeps only
+   * what still matches, until the answer to what's typed now arrives
+   */
+  function withInstant(arrived: MessageSummary[], reset: boolean): MessageSummary[] {
+    if (!reset || !query.value) return arrived
+    const current = query.value.trim() === search.value.trim()
+    const kept = current ? arrived : arrived.filter(message => messageMatches(message, terms.value))
+    const quick = instantMatches() ?? []
+    const ids = new Set(kept.map(leaveKey))
+    return [...kept, ...quick.filter(message => !ids.has(leaveKey(message)))].sort((a, b) => b.date.localeCompare(a.date))
+  }
+
+  // Each keystroke: the matches on screen at once, before the server is asked
+  watch(search, (text, before) => {
+    if (!route.path.startsWith('/mail') || ai.value.on || filtering.value) return
+    if (!text.trim()) {
+      // Cleared: the folder as it was, straight away
+      const page = before?.trim() ? listCache.value[JSON.stringify([shellAccount.value?.email, listQuery(), ''])]?.page : undefined
+      if (page) messages.value = page.messages.filter(staying)
+      return
+    }
+    const quick = instantMatches()
+    if (quick) messages.value = quick
+  })
+  /** Typed, and the server hasn't answered for it yet */
+  const searchPending = computed(() => !!search.value.trim() && (search.value.trim() !== query.value.trim() || status.value === 'loading' || status.value === 'refreshing'))
+
   async function load(reset = true) {
     if (!reset && (!cursor.value || status.value !== 'idle')) return
 
     const current = ++generation
     const cached = reset ? listCache.value[cacheKey()]?.page : undefined
+    const quick = reset && !cached ? instantMatches() : undefined
     if (cached) {
       messages.value = cached.messages.filter(staying)
       total.value = cached.total
       cursor.value = undefined
+    } else if (quick?.length) {
+      messages.value = quick
+      cursor.value = undefined
     }
-    status.value = cached ? 'refreshing' : reset ? 'loading' : 'more'
+    status.value = cached || quick?.length ? 'refreshing' : reset ? 'loading' : 'more'
 
     try {
       const page = await $fetch<MessagePage>('/api/messages', {
@@ -87,7 +151,7 @@ const _useMail = () => {
       })
       if (current !== generation) return
 
-      const arrived = page.messages.filter(staying)
+      const arrived = withInstant(page.messages.filter(staying), reset)
       messages.value = reset ? arrived : [...messages.value, ...arrived]
       total.value = page.total
       cursor.value = page.cursor
@@ -170,7 +234,6 @@ const _useMail = () => {
 
   // A question asked of every folder at once. While it's on, its matches
   // take the list's place; they can come from any folder
-  const ai = ref<{ on: boolean, status: 'idle' | 'loading' | 'done' | 'error', query: string, result?: AiSearchResult, error?: string }>({ on: false, status: 'idle', query: '' })
 
   async function askAi(question: string) {
     const q = question.trim()
@@ -375,6 +438,7 @@ const _useMail = () => {
     folder,
     search,
     terms,
+    searchPending,
     filter,
     filters,
     filtering,
