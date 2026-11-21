@@ -18,6 +18,17 @@ const body = useTemplateRef('body')
 const subject = useTemplateRef('subject')
 const translation = useMessageTranslation(() => props.message, () => [subject.value, body.value?.root()])
 
+// What the search was for, marked in the subject and the message
+const { terms } = useMail()
+const roots = () => [subject.value, body.value?.root()]
+const mark = () => highlightIn(roots(), terms.value)
+watch([terms, translation.state], () => nextTick(mark))
+onBeforeUnmount(() => highlightIn(roots(), []))
+function rendered() {
+  translation.rendered()
+  mark()
+}
+
 defineExpose({ summarize, translate: translation.toggle, translationState: translation.state })
 
 const hasRemote = computed(() => props.message.remoteContent && !showImages.value && !props.message.remoteShown)
@@ -63,7 +74,7 @@ const hasRemote = computed(() => props.message.remoteContent && !showImages.valu
         ref="body"
         :message="message"
         :remote="showImages || message.remoteShown"
-        @rendered="translation.rendered()"
+        @rendered="rendered"
       />
 
       <MailAttachments

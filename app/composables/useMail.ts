@@ -16,6 +16,8 @@ const _useMail = () => {
 
   const search = ref('')
   const query = refDebounced(search, 300)
+  /** The words being searched for, as typed, for marking them in the results */
+  const terms = computed(() => searchTerms(search.value))
   const filter = ref<'all' | 'unread' | 'flagged'>('all')
   // Narrowing a search: who sent it, when, and whether it has files
   const filters = ref<MailFilters>({})
@@ -372,6 +374,7 @@ const _useMail = () => {
     folderPath,
     folder,
     search,
+    terms,
     filter,
     filters,
     filtering,

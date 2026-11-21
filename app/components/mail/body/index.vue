@@ -54,6 +54,7 @@ const srcdoc = computed(() => `<!doctype html><html><head><meta http-equiv="Cont
   a{color:${token('--ui-color-primary-600', '#0C7A57')}}
   blockquote{margin:0 0 0 .25em;padding-left:1em;border-left:2px solid #d6d3d1;color:#57534e}
   pre{white-space:pre-wrap}
+  ::highlight(lb-search){background-color:rgb(250 204 21 / .42);color:inherit}
 </style></head><body><div id="lb-root">${props.message.html ?? ''}</div></body></html>`)
 
 let observer: ResizeObserver | undefined

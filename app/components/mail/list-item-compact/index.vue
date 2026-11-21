@@ -40,14 +40,14 @@ const person = computed(() => props.sent
         <span
           class="w-44 shrink-0 truncate"
           :class="message.unread ? 'font-semibold text-highlighted' : 'text-toned'"
-        >{{ person }}</span>
+        ><MailMark :text="person" /></span>
 
         <span class="flex-1 min-w-0 truncate">
-          <span :class="message.unread ? 'font-semibold text-highlighted' : 'text-default'">{{ message.subject || '(No subject)' }}</span>
+          <span :class="message.unread ? 'font-semibold text-highlighted' : 'text-default'"><MailMark :text="message.subject || '(No subject)'" /></span>
           <span
             v-if="message.preview"
             class="text-muted"
-          > – {{ message.preview }}</span>
+          > – <MailMark :text="message.preview" /></span>
         </span>
 
         <span class="shrink-0 flex items-center gap-1.5 text-xs text-muted tabular-nums group-hover:invisible">

@@ -40,6 +40,8 @@
    (app/app.config.ts → app/plugins/theme.client.ts). What's left here are the
    calendar template's tokens, flattened to paper: opaque, no blur */
 :root {
+  /* Words being searched for, marked in the results as you type */
+  --lb-search-mark: color-mix(in oklab, #FACC15 42%, transparent);
   --glass-bg: var(--ui-bg);
   --glass-filter: none;
   --overlay-blur: 0px;
@@ -72,6 +74,7 @@
 }
 
 .dark {
+  --lb-search-mark: color-mix(in oklab, #FACC15 30%, transparent);
   --weekend-bg: rgb(0 0 0 / 0.14);
   --lb-avatar-1: #3A3227; --lb-avatar-1-text: #E3D3BC;
   --lb-avatar-2: #26352D; --lb-avatar-2-text: #C3DCCD;
@@ -430,4 +433,10 @@ body {
       0 16px 32px -12px rgb(0 0 0 / 0.5),
       0 40px 72px -32px rgb(0 0 0 / 0.6);
   }
+}
+
+/* Words being searched for, inside an open message (utils/search-highlight.ts) */
+::highlight(lb-search) {
+  background-color: var(--lb-search-mark);
+  color: inherit;
 }
