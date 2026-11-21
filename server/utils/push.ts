@@ -48,6 +48,20 @@ export async function removePush(endpoint: string) {
   await useStorage('citrusmail').removeItem(subKey(endpoint))
 }
 
+/** A mailbox that moved between JMAP and IMAP: push reads it the new way, its cursors start over */
+export async function updatePushAccount(account: AccountSettings) {
+  const storage = useStorage('citrusmail')
+  const email = account.email.toLowerCase()
+  for (const key of await storage.getKeys(PREFIX)) {
+    const stored = await storage.getItem<StoredPush>(key)
+    if (!stored) continue
+    const accounts = await unsealValue<AccountSettings[]>(stored.accounts).catch(() => [])
+    if (!accounts.some(item => item.email.toLowerCase() === email)) continue
+    const cursors = Object.fromEntries(Object.entries(stored.cursors).filter(([mailbox]) => mailbox !== email))
+    await storage.setItem(key, { ...stored, cursors, accounts: await sealValue(accounts.map(item => item.email.toLowerCase() === email ? account : item)) })
+  }
+}
+
 /** Signing out of a mailbox stops push for it on every browser */
 export async function forgetPushFor(email: string) {
   const storage = useStorage('citrusmail')

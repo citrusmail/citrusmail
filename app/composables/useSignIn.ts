@@ -26,7 +26,8 @@ export function useSignIn() {
     password: '',
     name: '',
     username: '',
-    incoming: { protocol: 'imap', host: '', port: 993, security: 'tls' },
+    // JMAP first: discovery replaces it with whatever the address really has
+    incoming: { protocol: 'jmap', host: '', port: 443, security: 'tls' },
     outgoing: { host: '', port: 465, security: 'tls' },
     caldav: '',
     carddav: ''

@@ -11,53 +11,20 @@ export function searchTerms(text: string): string[] {
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
-/** A message's searchable text, folded once and kept, since search tests it on every keystroke */
-const haystacks = new WeakMap<object, string>()
-export function searchHaystack(message: Pick<MessageSummary, 'subject' | 'from' | 'to' | 'preview'>): string {
-  let hay = haystacks.get(message)
-  if (hay === undefined) {
-    hay = fold([
-      message.subject,
-      message.from?.name, message.from?.address,
-      ...(message.to ?? []).flatMap(address => [address.name, address.address]),
-      message.preview
-    ].filter(Boolean).join('\n'))
-    haystacks.set(message, hay)
-  }
-  return hay
-}
-
-/** A test for what's typed, made once and run over every message */
-export function searchMatcher(terms: string[]): (message: Pick<MessageSummary, 'subject' | 'from' | 'to' | 'preview'>) => boolean {
-  const patterns = terms.map(term => new RegExp(`(?:^|[^\\p{L}\\p{N}])${escape(fold(term))}`, 'u'))
-  return message => patterns.length > 0 && patterns.every(pattern => pattern.test(searchHaystack(message)))
-}
-
 /** Every term begins a word somewhere in the message (accents ignored) */
 export function messageMatches(message: Pick<MessageSummary, 'subject' | 'from' | 'to' | 'preview'>, terms: string[]): boolean {
-  return searchMatcher(terms)(message)
+  if (!terms.length) return false
+  const haystack = fold([
+    message.subject,
+    message.from?.name, message.from?.address,
+    ...(message.to ?? []).flatMap(address => [address.name, address.address]),
+    message.preview
+  ].filter(Boolean).join('\n'))
+  return terms.every(term => new RegExp(`(?:^|[^\\p{L}\\p{N}])${escape(fold(term))}`, 'u').test(haystack))
 }
 
-/**
- * The files the server found by name that still hold every word typed. The
- * server matches anywhere in a name ("voice" finds "Invoice.pdf"), so this does too
- */
-export function attachmentNameMatches(message: Pick<MessageSummary, 'matchedAttachments'>, terms: string[]): MatchedAttachment[] {
-  if (!message.matchedAttachments?.length || !terms.length) return []
-  const folded = terms.map(fold)
-  return message.matchedAttachments.filter((file) => {
-    // Found inside the file: its name needn't hold the words
-    if (file.passage) return true
-    const name = fold(file.filename)
-    return folded.every(term => name.includes(term))
-  })
-}
-
-/**
- * The text cut into plain and matching pieces, for marking matches as you type (accents ignored, as when matching).
- * `anywhere` marks a term inside a word too, as file names are matched
- */
-export function highlightParts(text: string, terms: string[], anywhere = false): { text: string, hit: boolean }[] {
+/** The text cut into plain and matching pieces, for marking matches as you type (accents ignored, as when matching) */
+export function highlightParts(text: string, terms: string[]): { text: string, hit: boolean }[] {
   if (!text || !terms.length) return [{ text, hit: false }]
   // Matched on the folded text; `at[i]` is where folded character i came from
   let folded = ''
@@ -71,7 +38,7 @@ export function highlightParts(text: string, terms: string[], anywhere = false):
     i += char.length
   }
   at.push(text.length)
-  const pattern = new RegExp(`${anywhere ? '' : '(?<![\\p{L}\\p{N}])'}(${[...terms].map(fold).sort((a, b) => b.length - a.length).map(escape).join('|')})`, 'gu')
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(${[...terms].map(fold).sort((a, b) => b.length - a.length).map(escape).join('|')})`, 'gu')
   const parts: { text: string, hit: boolean }[] = []
   let done = 0
   for (const match of folded.matchAll(pattern)) {

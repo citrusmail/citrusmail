@@ -58,6 +58,13 @@ export interface AccountSettings {
   incoming: IncomingSettings
   /** With JMAP, only used when the JMAP server can't send mail itself */
   outgoing: ServerSettings
+  /**
+   * Signed in over JMAP on a server that speaks IMAP too: the IMAP server,
+   * read instead while JMAP is down (server/utils/protocol-switch.ts)
+   */
+  imapFallback?: IncomingSettings
+  /** Servers entered by hand (Advanced): their protocol is a choice, never changed for them */
+  serversChosen?: boolean
   /** CalDAV / CardDAV root, e.g. https://dav.example.com. Empty = feature off */
   caldav?: string
   carddav?: string
@@ -113,6 +120,8 @@ export interface SessionAccount {
 export interface MailboxSummary {
   email: string
   name?: string
+  /** How it's read: a change means its saved message ids no longer apply */
+  protocol?: MailProtocol
 }
 
 /* ------------------------------------------------------------------ */

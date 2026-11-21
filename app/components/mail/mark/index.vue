@@ -1,12 +1,8 @@
 <script setup lang="ts">
 // Text with the words being searched for marked, as you type
-const props = defineProps<{
-  text: string
-  /** Mark words found inside other words too, as file names are matched */
-  anywhere?: boolean
-}>()
+const props = defineProps<{ text: string }>()
 const { terms } = useMail()
-const parts = computed(() => highlightParts(props.text, terms.value, props.anywhere))
+const parts = computed(() => highlightParts(props.text, terms.value))
 </script>
 
 <template>

@@ -7,9 +7,9 @@ const incoming = defineModel<IncomingSettings>('incoming', { required: true })
 
 const tabs = {
   items: [
+    { label: 'JMAP', value: 'jmap' },
     { label: 'IMAP', value: 'imap' },
-    { label: 'POP3', value: 'pop3' },
-    { label: 'JMAP', value: 'jmap' }
+    { label: 'POP3', value: 'pop3' }
   ],
   content: false,
   color: 'neutral' as const,

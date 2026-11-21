@@ -79,6 +79,9 @@ async function checkPop3(account: AccountSettings, cursors: Cursors): Promise<Ne
 }
 
 /** JMAP ids don't grow either: the newest unread message's time stands in, per folder */
+/** New-mail cursors over JMAP are times in ms; IMAP's are UIDs, far below this */
+const JMAP_CURSOR_FLOOR = 1e12
+
 async function checkJmap(account: AccountSettings, folders: string[], cursors: Cursors): Promise<NewMail> {
   const result: NewMail = { cursors: {}, messages: [] }
   // Reports for tracked messages are marked read first, as on IMAP
@@ -87,7 +90,9 @@ async function checkJmap(account: AccountSettings, folders: string[], cursors: C
   for (const path of folders) {
     try {
       const page = await mail.listMessages(path, { unread: true })
-      const since = cursors[path]
+      // A cursor is a time here; a smaller one is an IMAP number from before
+      // this mailbox moved to JMAP: start from now, never from 1970
+      const since = (cursors[path] ?? 0) < JMAP_CURSOR_FLOOR ? undefined : cursors[path]
       const newest = page.messages.reduce((max, msg) => Math.max(max, Date.parse(msg.date) || 0), 0)
       result.cursors[path] = Math.max(newest, since ?? 0)
       if (since !== undefined) result.messages.push(...page.messages.filter(msg => (Date.parse(msg.date) || 0) > since).slice(0, PER_FOLDER))
